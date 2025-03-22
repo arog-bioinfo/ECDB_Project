@@ -1,0 +1,28 @@
+Fazer download 
+
+```{r, echo = FALSE}
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install("cBioPortalData")
+```
+
+
+```{r, message=FALSE}
+library(cBioPortalData)
+```
+
+
+```{r, echo = FALSE}
+cBioDataPack(
+  "luad_tcga_pan_can_atlas_2018",
+  use_cache = "."
+)
+
+#untar("luad_tcga_pan_can_atlas_2018")
+```
+
+```{r}
+summary(pack)
+```
+
+
