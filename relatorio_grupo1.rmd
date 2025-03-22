@@ -12,10 +12,10 @@ library(cBioPortalData)
 ```
 
 
-```{r, echo = FALSE}
+```{r, message = FALSE}
 cBioDataPack(
   "luad_tcga_pan_can_atlas_2018",
-  use_cache = "."
+  ""
 )
 
 #untar("luad_tcga_pan_can_atlas_2018")
