@@ -1,28 +1,88 @@
-Fazer download 
+Fazer install e load packages
 
-```{r, echo = FALSE}
-#if (!requireNamespace("BiocManager", quietly = TRUE))
-#    install.packages("BiocManager")
-#BiocManager::install("cBioPortalData")
+```{r, results='hide', warning = FALSE, message=FALSE}
+
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install(c(
+  "TCGAbiolinks",
+  "DESeq2",
+  "Biobase",
+  "genefilter",
+  "pheatmap",
+  "org.Hs.eg.db",
+  "fgsea",
+  "SummarizedExperiment",
+  "Glimma",
+  "edgeR",
+  "AnnotationDbi"
+))
+
+install.packages(c(
+  "jpeg",
+  "ggbeeswarm",
+  "ggplot2",
+  "xfun",
+  "factoextra",
+  "Rtsne",
+  "gplots",
+  "RColorBrewer",
+  "tidyverse",
+  "rpart",
+  "rsample",
+  "caret"
+))
+
 ```
 
-
-```{r, message=FALSE}
-library(cBioPortalData)
+Load Packages
+```{r,results='hide', warning = FALSE, message=FALSE}
+library(BiocManager)
+library(jpeg)
+library(TCGAbiolinks)
+library(Biobase)
+library(DESeq2)
+library(ggbeeswarm)
+library(genefilter)
+library(pheatmap)
+library(org.Hs.eg.db)
+library(fgsea)
+library(ggplot2)
+library(xfun)
+library(SummarizedExperiment) 
+library(factoextra)
+library(Rtsne)
+library(gplots)
+library(edgeR)
+library(AnnotationDbi)
+library(RColorBrewer)
+library(tidyverse)
+library(rpart)
+library(rsample)
+library(caret)
 ```
 
-
+Download dos dados para directoria desejada:
 ```{r, message = FALSE}
-cBioDataPack(
-  "luad_tcga_pan_can_atlas_2018",
-  ""
+
+
+query_LUAD <- GDCquery(
+  project = "TCGA-LUAD",
+  data.category = "Transcriptome Profiling",
+  data.type = "Gene Expression Quantification",
+  workflow.type = "STAR - Counts"
 )
 
-#untar("luad_tcga_pan_can_atlas_2018")
-```
+GDCdownload(query = query_LUAD, directory = "/home/arog/Documents/2_semestre/ECDB/project_data/GDCdata")
 
-```{r}
-summary(pack)
+rna_seq_LUAD <- GDCprepare(
+  query = query_LUAD,
+  save = TRUE,
+  save.filename = "mRNA_TCGA-LUAD.rda", 
+  directory = "/home/arog/Documents/2_semestre/ECDB/project_data/GDCdata"
+)
+
 ```
 
 
