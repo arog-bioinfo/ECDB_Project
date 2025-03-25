@@ -8,10 +8,7 @@ We are using the **Lung Adenocarcinoma (TCGA, GDC)** dataset, available at [cBio
 
 ## Project Structure   
 ```
-├── data/                # Raw and processed datasets
-├── scripts/             # R and Rmd scripts for analysis
-├── results/             # Generated reports, figures, and outputs
-├── report/              # Final report in HTML format
+├── relatorio_grupo1.rmd # R and Rmd script for analysis
 ├── README.md            # Project documentation
 ```
 
@@ -32,8 +29,11 @@ The project is divided into two phases:
 The following tools and techniques will be used:
 - **Data Processing**: R, Bioconductor, tidyverse
 - **Visualization**: ggplot2, heatmaps, PCA plots
-- **Statistical Analysis**: limma, DESeq2
-- **Machine Learning**: caret, randomForest, SVM
+- **Statistical Analysis**: DESeq2, edgeR, limma, genefilter
+- **Enrichment Analysis**: fgsea, org.Hs.eg.db, AnnotationDbi
+- **Machine Learning**: caret, rpart, rsample
+- **Dimensionality Reduction**: Rtsne, factoextra
+- **Clustering**: pheatmap, gplots
 
 ## Reproducibility
 - All analyses will be performed in R Markdown and exported as HTML reports.
