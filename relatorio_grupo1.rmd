@@ -1,4 +1,10 @@
-Fazer install e load packages
+# Introduction  
+
+This analysis is conducted in R using Bioconductor packages and other essential libraries for statistical and machine learning applications. Before proceeding, we need to install and load the required packages.
+
+## Install Required Packages  
+
+First, ensure that Bioconductor is installed, along with the necessary libraries:  
 
 ```{r, results='hide', warning = FALSE, message=FALSE}
 
@@ -36,7 +42,10 @@ install.packages(c(
 
 ```
 
-Load Packages
+## Load Packages  
+
+After installing the required packages, we need to load them into our R environment. The following command ensures all libraries are available for analysis:
+
 ```{r,results='hide', warning = FALSE, message=FALSE}
 library(BiocManager)
 library(jpeg)
@@ -87,5 +96,43 @@ rna_seq_LUAD = get(
   )
 ```
 
+## Download and Load Data  
+
+
+```{r, message = FALSE}
+# Define the base directory
+base_dir <- "~/ECDB_project_data"  # Change this to your desired path
+
+# Create directory if it doesn't exist
+if (!dir.exists(base_dir)) {
+  dir.create(base_dir, recursive = TRUE)
+}
+
+# File path for storing processed data
+rna_seq_file <- file.path(base_dir, "mRNA_TCGA-LUAD.rda")
+
+# Check if the data file already exists, if not, download and process
+if (!file.exists(rna_seq_file)) {
+  
+  query_LUAD <- GDCquery(
+    project = "TCGA-LUAD",
+    data.category = "Transcriptome Profiling",
+    data.type = "Gene Expression Quantification",
+    workflow.type = "STAR - Counts"
+  )
+  
+  GDCdownload(query = query_LUAD, directory = base_dir)
+  
+  rna_seq_LUAD <- GDCprepare(
+    query = query_LUAD,
+    save = TRUE,
+    save.filename = rna_seq_file,
+    directory = base_dir
+  )
+  
+} else {
+  rna_seq_LUAD <- get(load(rna_seq_file))
+}
+```
 
 
