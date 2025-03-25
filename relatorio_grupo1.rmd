@@ -135,4 +135,43 @@ if (!file.exists(rna_seq_file)) {
 }
 ```
 
+## Tipo 2
+```{r}
+
+# Define the base directory
+base_dir <- "~/ECDB_project_data"  # Change this to your desired path
+
+# Create directory if it doesn't exist
+if (!dir.exists(base_dir)) {
+  dir.create(base_dir, recursive = TRUE)
+}
+
+# File path for storing processed data
+rna_seq_file <- file.path(base_dir, "mRNA_TCGA-LUAD.rda")
+
+# Check if the data file already exists, if not, download and process
+if (!file.exists(rna_seq_file)) {
+  
+  query_LUAD <- GDCquery(
+    project = "TCGA-LUAD",
+    data.category = "Transcriptome Profiling",
+    data.type = "Gene Expression Quantification",
+    workflow.type = "STAR - Counts"
+  )
+  
+  GDCdownload(query = query_LUAD, directory = base_dir)
+  
+  rna_seq_LUAD <- GDCprepare(
+    query = query_LUAD,
+    save = TRUE,
+    save.filename = rna_seq_file,
+    directory = base_dir
+  )
+  
+} else {
+  rna_seq_LUAD <- get(load(rna_seq_file))
+}
+
+```
+
 
