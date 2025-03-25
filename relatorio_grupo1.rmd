@@ -16,7 +16,7 @@ output:
 # {.tabset} 
 
 
-## Introduction  
+## Dataset Download and Import  
 
 This analysis is conducted in R using Bioconductor packages and other essential libraries for statistical and machine learning applications. Before proceeding, we need to install and load the required packages.
 
@@ -94,41 +94,55 @@ library(caret)
 
 
 ```{r, message = FALSE}
-# Define the base directory
-base_dir <- "/home/arog/Documents/2_semestre/ECDB/project_data"  # Change this to your desired path
-
-# Create directory if it doesn't exist
-if (!dir.exists(base_dir)) {
-  dir.create(base_dir, recursive = TRUE)
-}
-
-# File path for storing processed data
-gdc_data <- file.path(base_dir, "GDCdata")
-rna_seq_file <- file.path(base_dir, "mRNA_TCGA-LUAD.rda")
-
-# Check if the data file already exists, if not, download and process
-if (!file.exists(rna_seq_file)) {
-
-  query_LUAD <- GDCquery(
-    project = "TCGA-LUAD",
-    data.category = "Transcriptome Profiling",
-    data.type = "Gene Expression Quantification",
-    workflow.type = "STAR - Counts"
-  )
-
-  GDCdownload(query = query_LUAD, directory = gdc_data)
-
-  rna_seq_LUAD <- GDCprepare(
-    query = query_LUAD,
-    save = TRUE,
-    save.filename = rna_seq_file,
-    directory = gdc_data
-  )
-
-} else {
-  rna_seq_LUAD <- get(load(rna_seq_file))
-}
+# # Define the base directory
+# base_dir <- "/home/arog/Documents/2_semestre/ECDB/project_data"  # Change this to your desired path
+# 
+# # Create directory if it doesn't exist
+# if (!dir.exists(base_dir)) {
+#   dir.create(base_dir, recursive = TRUE)
+# }
+# 
+# # File path for storing processed data
+# gdc_data <- file.path(base_dir, "GDCdata")
+# rna_seq_file <- file.path(base_dir, "mRNA_TCGA-LUAD.rda")
+# 
+# # Check if the data file already exists, if not, download and process
+# if (!file.exists(rna_seq_file)) {
+# 
+#   query_LUAD <- GDCquery(
+#     project = "TCGA-LUAD",
+#     data.category = "Transcriptome Profiling",
+#     data.type = "Gene Expression Quantification",
+#     workflow.type = "STAR - Counts"
+#   )
+# 
+#   GDCdownload(query = query_LUAD, directory = gdc_data)
+# 
+#   rna_seq_LUAD <- GDCprepare(
+#     query = query_LUAD,
+#     save = TRUE,
+#     save.filename = rna_seq_file,
+#     directory = gdc_data
+#   )
+# 
+# } else {
+#   rna_seq_LUAD <- get(load(rna_seq_file))
+# }
 
 ```
+
+
+## Contextualization of the Data
+
+The **TCGA-LUAD (The Cancer Genome Atlas - Lung Adenocarcinoma) project** is part of the Genomic Data Commons (GDC), aimed at characterizing lung adenocarcinoma at the molecular level. It provides **clinical, genomic, and molecular** data, including patient demographics, tumor characteristics, sequencing data, and protein expression profiles.  
+
+This study focuses on analyzing **data and metadata** to assess quality, completeness, and usability. By examining metadata, we evaluate its role in ensuring data consistency, accessibility, and interoperability for research applications.  
+
+
+## Data Pre Processing
+
+## Data Summary
+
+## Statistical and Functional Data Analysis
 
 
