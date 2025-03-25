@@ -16,47 +16,66 @@ output:
 # {.tabset} 
 
 
-## Dataset Download and Import  
+## Dataset Download and Import
 
-This analysis is conducted in R using Bioconductor packages and other essential libraries for statistical and machine learning applications. Before proceeding, we need to install and load the required packages.
+This analysis is conducted in R using Bioconductor packages and other essential libraries for statistical and machine learning applications. 
 
-### Install Required Packages  
+In this section, we will perform the following tasks: install and load the required packages, query and download gene expression data using the GDC data portal, and import the data into a suitable structure for downstream analysis.
 
-First, ensure that Bioconductor is installed, along with the necessary libraries:  
+### Installation and Import of Packages
+
+This section presents all the packages used in this work, which support data acquisition and analysis throughout the document, enhancing the efficiency of retrieving and interpreting relevant information. The code checks whether each package is already installed and installs it if necessary.
 
 ```{r, results='hide', warning = FALSE, message=FALSE}
 
-# if (!requireNamespace("BiocManager", quietly = TRUE))
-#   install.packages("BiocManager")
-# 
-# BiocManager::install(c(
-#   "TCGAbiolinks",
-#   "DESeq2",
-#   "Biobase",
-#   "genefilter",
-#   "pheatmap",
-#   "org.Hs.eg.db",
-#   "fgsea",
-#   "SummarizedExperiment",
-#   "Glimma",
-#   "edgeR",
-#   "AnnotationDbi"
-# ))
-# 
-# install.packages(c(
-#   "jpeg",
-#   "ggbeeswarm",
-#   "ggplot2",
-#   "xfun",
-#   "factoextra",
-#   "Rtsne",
-#   "gplots",
-#   "RColorBrewer",
-#   "tidyverse",
-#   "rpart",
-#   "rsample",
-#   "caret"
-# ))
+# Install BiocManager if not already installed
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+# List of Bioconductor packages
+bioc_packages <- c(
+  "TCGAbiolinks",
+  "DESeq2",
+  "Biobase",
+  "genefilter",
+  "pheatmap",
+  "org.Hs.eg.db",
+  "fgsea",
+  "SummarizedExperiment",
+  "Glimma",
+  "edgeR",
+  "AnnotationDbi"
+)
+
+# Install missing Bioconductor packages
+for (pkg in bioc_packages) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    BiocManager::install(pkg, ask = FALSE)
+  }
+}
+
+# List of CRAN packages
+cran_packages <- c(
+  "jpeg",
+  "ggbeeswarm",
+  "ggplot2",
+  "xfun",
+  "factoextra",
+  "Rtsne",
+  "gplots",
+  "RColorBrewer",
+  "tidyverse",
+  "rpart",
+  "rsample",
+  "caret"
+)
+
+# Install missing CRAN packages
+for (pkg in cran_packages) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg)
+  }
+}
 
 ```
 
@@ -90,44 +109,53 @@ library(rsample)
 library(caret)
 ```
 
-### Download and Load Data  
+### Data Query and Preparation
 
+The **`GDCquery()`** function is used to perform a query on the database. In this function, several parameters are defined to filter the dataset that will later be downloaded.
+
+The **`project`** parameter corresponds to the ID assigned to the cancer type, allowing the selection of information specifically related to endometrial carcinoma of the uterine body. The **`data.category`** parameter is used to specify the data category to be selected. In this case, since the goal is to perform transcriptomic analysis, the category **"Transcriptome Profiling"** was selected to retrieve gene expression profiling data.
+
+Among the available gene expression profiling data, the analysis was restricted to gene expression quantification by setting **`data.type`** to **"Gene Expression Quantification"**. Finally, the desired type of gene expression analysis was specified, opting for **"STAR-Counts"**. This workflow indicates that the algorithm used to count gene expression from aligned sequences was based on the **STAR** tool.
+
+The **`GDCdownload()`** function is then used to download the data according to the query defined in the previous step. Next, the **`GDCprepare()`** function was used to generate a **`SummarizedExperiment`** object, compiling all the downloaded data into a single object to facilitate further analysis. It is worth noting that this function also allows saving the data in **.RData** format, making it easier to reload using the **`load()`** function.
+
+> **Note**: This workflow enables the simultaneous download of both gene expression data and the associated metadata for the samples and genes.
 
 ```{r, message = FALSE}
-# # Define the base directory
-# base_dir <- "/home/arog/Documents/2_semestre/ECDB/project_data"  # Change this to your desired path
-# 
-# # Create directory if it doesn't exist
-# if (!dir.exists(base_dir)) {
-#   dir.create(base_dir, recursive = TRUE)
-# }
-# 
-# # File path for storing processed data
-# gdc_data <- file.path(base_dir, "GDCdata")
-# rna_seq_file <- file.path(base_dir, "mRNA_TCGA-LUAD.rda")
-# 
-# # Check if the data file already exists, if not, download and process
-# if (!file.exists(rna_seq_file)) {
-# 
-#   query_LUAD <- GDCquery(
-#     project = "TCGA-LUAD",
-#     data.category = "Transcriptome Profiling",
-#     data.type = "Gene Expression Quantification",
-#     workflow.type = "STAR - Counts"
-#   )
-# 
-#   GDCdownload(query = query_LUAD, directory = gdc_data)
-# 
-#   rna_seq_LUAD <- GDCprepare(
-#     query = query_LUAD,
-#     save = TRUE,
-#     save.filename = rna_seq_file,
-#     directory = gdc_data
-#   )
-# 
-# } else {
-#   rna_seq_LUAD <- get(load(rna_seq_file))
-# }
+# Define the base directory
+base_dir <- "/home/arog/Documents/2_semestre/ECDB/project_data"  # Change this to your desired path
+
+# Create directory if it doesn't exist
+if (!dir.exists(base_dir)) {
+  dir.create(base_dir, recursive = TRUE)
+}
+
+# File path for storing processed data
+gdc_data <- file.path(base_dir, "GDCdata")
+rna_seq_file <- file.path(base_dir, "mRNA_TCGA-LUAD.rda")
+
+# Check if the data file already exists, if not, download and process
+if (!file.exists(rna_seq_file)) {
+
+  query_LUAD <- GDCquery(
+    project = "TCGA-LUAD",
+    data.category = "Transcriptome Profiling",
+    data.type = "Gene Expression Quantification",
+    workflow.type = "STAR - Counts"
+  )
+
+  GDCdownload(query = query_LUAD, directory = gdc_data)
+
+  rna_seq_LUAD <- GDCprepare(
+    query = query_LUAD,
+    save = TRUE,
+    save.filename = rna_seq_file,
+    directory = gdc_data
+  )
+
+} else {
+  rna_seq_LUAD <- get(load(rna_seq_file))
+}
 
 ```
 
