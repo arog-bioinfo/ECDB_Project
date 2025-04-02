@@ -1,0 +1,213 @@
+---
+title: "Lung Adenocarcinoma Analysis (TCGA, GDC)"
+author:
+- Artur Gomes | PG55692
+- Catarina Gomes | PG55694
+- Maria Carvalho | PG55130
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+<img src="EEUMLOGO.png" alt="Logo da Empresa" style="float:right; margin: 10px 10px 0 0; width: 110px; height: auto;" />
+
+# {.tabset} 
+
+
+## Dataset Download and Import  
+
+This analysis is conducted in R using Bioconductor packages and other essential libraries for statistical and machine learning applications. Before proceeding, we need to install and load the required packages.
+
+### Install Required Packages  
+
+First, ensure that Bioconductor is installed, along with the necessary libraries:  
+
+```{r, results='hide', warning = FALSE, message=FALSE}
+
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#   install.packages("BiocManager")
+# 
+# BiocManager::install(c(
+#   "TCGAbiolinks",
+#   "DESeq2",
+#   "Biobase",
+#   "genefilter",
+#   "pheatmap",
+#   "org.Hs.eg.db",
+#   "fgsea",
+#   "SummarizedExperiment",
+#   "Glimma",
+#   "edgeR",
+#   "AnnotationDbi"
+# ))
+# 
+# install.packages(c(
+#   "jpeg",
+#   "ggbeeswarm",
+#   "ggplot2",
+#   "xfun",
+#   "factoextra",
+#   "Rtsne",
+#   "gplots",
+#   "RColorBrewer",
+#   "tidyverse",
+#   "rpart",
+#   "rsample",
+#   "caret"
+# ))
+
+```
+
+### Load Packages  
+
+After installing the required packages, we need to load them into our R environment. The following command ensures all libraries are available for analysis:
+
+```{r,results='hide', warning = FALSE, message=FALSE}
+library(BiocManager)
+library(jpeg)
+library(TCGAbiolinks)
+library(Biobase)
+library(DESeq2)
+library(ggbeeswarm)
+library(genefilter)
+library(pheatmap)
+library(org.Hs.eg.db)
+library(fgsea)
+library(ggplot2)
+library(xfun)
+library(SummarizedExperiment) 
+library(factoextra)
+library(Rtsne)
+library(gplots)
+library(edgeR)
+library(AnnotationDbi)
+library(RColorBrewer)
+library(tidyverse)
+library(rpart)
+library(rsample)
+library(caret)
+```
+
+### Download and Load Data  
+
+
+```{r, message = FALSE}
+# # Define the base directory
+# base_dir <- "/home/arog/Documents/2_semestre/ECDB/project_data"  # Change this to your desired path
+# 
+# # Create directory if it doesn't exist
+# if (!dir.exists(base_dir)) {
+#   dir.create(base_dir, recursive = TRUE)
+# }
+# 
+# # File path for storing processed data
+# gdc_data <- file.path(base_dir, "GDCdata")
+# rna_seq_file <- file.path(base_dir, "mRNA_TCGA-LUAD.rda")
+# 
+# # Check if the data file already exists, if not, download and process
+# if (!file.exists(rna_seq_file)) {
+# 
+#   query_LUAD <- GDCquery(
+#     project = "TCGA-LUAD",
+#     data.category = "Transcriptome Profiling",
+#     data.type = "Gene Expression Quantification",
+#     workflow.type = "STAR - Counts"
+#   )
+# 
+#   GDCdownload(query = query_LUAD, directory = gdc_data)
+# 
+#   rna_seq_LUAD <- GDCprepare(
+#     query = query_LUAD,
+#     save = TRUE,
+#     save.filename = rna_seq_file,
+#     directory = gdc_data
+#   )
+# 
+# } else {
+#   rna_seq_LUAD <- get(load(rna_seq_file))
+# }
+
+```
+
+
+## Contextualization of the Data
+
+The **TCGA-LUAD (The Cancer Genome Atlas - Lung Adenocarcinoma) project** is part of the Genomic Data Commons (GDC), aimed at characterizing lung adenocarcinoma at the molecular level. It provides **clinical, genomic, and molecular** data, including patient demographics, tumor characteristics, sequencing data, and protein expression profiles.  
+
+This study focuses on analyzing **data and metadata** to assess quality, completeness, and usability. By examining metadata, we evaluate its role in ensuring data consistency, accessibility, and interoperability for research applications.  
+
+
+## Data Pre Processing
+
+In this stage, we preprocess the dataset to ensure its quality for differential expression and enrichment analysis. First, we separate the gene expression data from the metadata, structuring the dataset for efficient analysis. Then, we apply filtering techniques to remove noise, retaining only biologically relevant information that will enhance the accuracy of downstream analyses.
+
+```{r}
+# Extract gene expression matrix
+expression_data = as.data.frame(assay(rna_seq_LUAD))
+
+# Extract clinical metadata
+clinical_data <- colData(rna_seq_LUAD)
+
+# Check the first few rows of each dataset
+head(expression_data)[,1:5]  
+head(clinical_data)
+```
+### Missing Values (NA)
+
+We analyze missing values in the dataset to identify patterns, assess their impact, and determine the best approach for handling them, ensuring data integrity for further analysis.
+
+```{r}
+# For expression_data (gene expression matrix)
+percent_missing_expression <- colSums(is.na(expression_data)) / nrow(expression_data) * 100
+
+# For clinical_data (clinical_data)
+percent_missing_clinical <- colSums(is.na(clinical_data)) / nrow(clinical_data) * 100
+
+percent_missing_expression
+percent_missing_clinical
+```
+
+Some values in the clinical_data are missing (NA). We need to remove or impute these values to avoid bias.
+
+```{r}
+sorted_missing = sort(percent_missing_clinical, decreasing = TRUE)
+
+```
+```{r}
+# Selecionar apenas as colunas que possuem NAs
+```
+
+
+```{r}
+columns_with_na = names(clinical_data)[colSums(is.na(clinical_data)) > 0]
+
+# Exibir os nomes das variáveis com valores ausentes
+print(columns_with_na)
+
+```
+
+```{r}
+# Keep only genes where at least 50% of samples have counts >1
+keep <- rowSums(expression_data > 1) > (0.5 * ncol(expression_data))
+filtered_data <- expression_data[keep, ]
+
+```
+
+
+```{r}
+tabela_nas = data.frame(Variável = names(clinical_data), 
+                         Total_NAs = colSums(is.na(clinical_data)))
+
+print(tabela_nas)
+
+
+```
+
+
+## Data Summary
+
+## Statistical and Functional Data Analysis
+
+
