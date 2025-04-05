@@ -148,7 +148,7 @@ In this stage, we preprocess the dataset to ensure its quality for differential 
 expression_data = as.data.frame(assay(rna_seq_LUAD))
 
 # Extract clinical metadata
-clinical_data <- colData(rna_seq_LUAD)
+clinical_data = colData(rna_seq_LUAD)
 
 # Check the first few rows of each dataset
 head(expression_data)[,1:5]  
@@ -160,53 +160,69 @@ We analyze missing values in the dataset to identify patterns, assess their impa
 
 ```{r}
 # For expression_data (gene expression matrix)
-percent_missing_expression <- colSums(is.na(expression_data)) / nrow(expression_data) * 100
+percent_missing_expression = colSums(is.na(expression_data)) / nrow(expression_data) * 100
 
 # For clinical_data (clinical_data)
-percent_missing_clinical <- colSums(is.na(clinical_data)) / nrow(clinical_data) * 100
+percent_missing_clinical = colSums(is.na(clinical_data)) / nrow(clinical_data) * 100
 
 percent_missing_expression
 percent_missing_clinical
 ```
-
-Some values in the clinical_data are missing (NA). We need to remove or impute these values to avoid bias.
-
-```{r}
-sorted_missing = sort(percent_missing_clinical, decreasing = TRUE)
-
-```
-```{r}
-# Selecionar apenas as colunas que possuem NAs
-```
-
+There were no NAs for the `gene expression matrix`. In the `clinical_data` some values are missing (NA). We need to remove or impute these values to avoid bias.
 
 ```{r}
 columns_with_na = names(clinical_data)[colSums(is.na(clinical_data)) > 0]
 
-# Exibir os nomes das variáveis com valores ausentes
+# Variables with NAs
 print(columns_with_na)
 
 ```
 
-```{r}
-# Keep only genes where at least 50% of samples have counts >1
-keep <- rowSums(expression_data > 1) > (0.5 * ncol(expression_data))
-filtered_data <- expression_data[keep, ]
-
-```
-
+A table was created listing the variables and their corresponding missing values (NAs) to help identify which variables were selected for this analysis.
 
 ```{r}
 tabela_nas = data.frame(Variável = names(clinical_data), 
                          Total_NAs = colSums(is.na(clinical_data)))
 
 print(tabela_nas)
+```
 
+As a general rule in data preprocessing, variables with a high proportion of missing values can introduce bias or reduce the power of statistical analyses. Therefore, we chose to exclude variables with more than 30% missing values. This threshold strikes a balance between preserving as much data as possible while ensuring that the retained variables are informative and complete enough for meaningful analysis.
+By applying this filter, we focused the dataset on the most relevant and reliable features, which will improve the robustness of the downstream statistical and bioinformatic analyses.
+
+
+```{r}
+# Set the NA threshold
+threshold = 30  # in percent
+
+# For gene expression data
+expression_data_filtered = expression_data[, percent_missing_expression <= threshold]
+
+# For clinical data
+clinical_data_filtered = clinical_data[, percent_missing_clinical <= threshold]
+
+expression_data_filtered
+clinical_data_filtered
+```
+
+
+To ensure the reliability of downstream analyses, genes with low expression across the majority of samples were filtered out. Specifically, only genes with counts greater than 1 in more than 50% of the samples were retained. This step helps reduce noise from lowly expressed or non-informative genes.
+
+```{r}
+# Keep only genes where at least 50% of samples have counts >1
+keep = rowSums(expression_data > 1) > (0.5 * ncol(expression_data))
+filtered_data = expression_data[keep, ]
 
 ```
 
 
 ## Data Summary
+
+
+
+
+
+
 
 ## Statistical and Functional Data Analysis
 
