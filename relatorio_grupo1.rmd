@@ -167,10 +167,135 @@ The **TCGA-LUAD (The Cancer Genome Atlas - Lung Adenocarcinoma) project** is par
 This study focuses on analyzing **data and metadata** to assess quality, completeness, and usability. By examining metadata, we evaluate its role in ensuring data consistency, accessibility, and interoperability for research applications.  
 
 
-## Data Pre Processing
+### Objective
 
-## Data Summary
+This project aims to:
 
-## Statistical and Functional Data Analysis
+- Identify differentially expressed genes (DEGs) in LUAD
+- Investigate associations between gene expression and clinical variables
+- Discover biomarkers or gene signatures for prognosis or treatment
+
+
+## Initial Data Exploration
+```{r}
+cat("Dimensions:", dim(rna_seq_LUAD)[1], "genes x", dim(rna_seq_LUAD)[2], "samples\n")
+```
+
+### Gene and Sample Metadata
+
+```{r}
+gene_metadata <- rowData(rna_seq_LUAD)
+sample_metadata <- colData(rna_seq_LUAD)
+cat("Gene metadata:", dim(gene_metadata), "\n")
+cat("Sample metadata:", dim(sample_metadata), "\n")
+```
+
+
+## Clinical Metadata Analysis
+
+### Vital Status
+
+```{r}
+vital_status <- sample_metadata$vital_status
+table_vs <- prop.table(table(vital_status)) * 100
+barplot(table_vs, col = c("skyblue", "tomato"),
+        main = "Vital Status of LUAD Patients", ylab = "%")
+```
+
+**Interpretation**: Majority of patients were [interpret here: alive or deceased?]. Vital status is useful for survival analysis.
+
+
+### Tumor Stage (AJCC)
+
+```{r}
+stage <- sample_metadata$ajcc_pathologic_stage
+table_stage <- sort(prop.table(table(stage)) * 100, decreasing = TRUE)
+pie(table_stage, labels = paste(names(table_stage), sprintf("%.1f%%", table_stage)),
+    col = brewer.pal(length(table_stage), "Pastel1"),
+    main = "Tumor Stage Distribution")
+```
+
+**Interpretation**: Early-stage cases dominate, suggesting detection before extensive spread. Later stages correlate with poorer prognosis.
+
+
+### Smoking History
+
+```{r}
+smoking <- sample_metadata$tobacco_smoking_history
+table_smoke <- sort(prop.table(table(smoking, useNA = "ifany")) * 100, decreasing = TRUE)
+pie(table_smoke, labels = paste(names(table_smoke), sprintf("%.1f%%", table_smoke)),
+    col = brewer.pal(length(table_smoke), "Set3"),
+    main = "Smoking History")
+```
+
+**Interpretation**: A large percentage of LUAD patients have a history of smoking. Smoking is a major LUAD risk factor.
+
+
+### Age at Diagnosis
+
+```{r}
+age <- sample_metadata$age_at_index
+summary(age)
+boxplot(age, main = "Age at Diagnosis", col = "lightblue")
+hist(age, main = "Age Distribution", xlab = "Age", col = "orange")
+```
+
+**Interpretation**: LUAD affects primarily older adults, typically diagnosed between 55 and 80.
+
+
+## Data Preprocessing
+
+```{r}
+expression_data <- as.data.frame(assay(rna_seq_LUAD))
+clinical_data <- colData(rna_seq_LUAD)
+```
+
+### Check Missing Values
+
+```{r}
+na_clinical <- colSums(is.na(clinical_data))
+table_na <- data.frame(Variable = names(na_clinical), NAs = na_clinical)
+table_na <- table_na[order(-table_na$NAs), ]
+kableExtra::kable(table_na, caption = "Missing Values in Clinical Data")
+```
+
+Remove variables with >30% missing data:
+
+```{r}
+thresh <- 30
+na_pct <- na_clinical / nrow(clinical_data) * 100
+clinical_data_filtered <- clinical_data[, na_pct <= thresh]
+```
+
+### Filter Genes with Low Counts
+
+```{r}
+keep_genes <- rowSums(expression_data > 1) > ncol(expression_data) * 0.5
+expression_filtered <- expression_data[keep_genes, ]
+```
+
+
+## Exploratory Gene Expression Analysis
+
+### Sample Clustering Heatmap
+
+```{r}
+vsd <- vst(DESeqDataSetFromMatrix(countData = expression_filtered,
+                                   colData = clinical_data_filtered,
+                                   design = ~ 1))
+mat <- assay(vsd)[1:50, ]  # Top 50 genes only for visualization
+pheatmap(mat, scale = "row", show_rownames = FALSE,
+         main = "Heatmap of Top 50 Genes (VST Transformed)")
+```
+
+### PCA
+
+```{r}
+pca <- prcomp(t(mat))
+autoplot(pca, data = as.data.frame(colData(vsd)), colour = 'vital_status') +
+  ggtitle("PCA of LUAD Samples")
+```
+
+
 
 
