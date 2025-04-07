@@ -123,7 +123,7 @@ The **`GDCdownload()`** function is then used to download the data according to 
 
 ```{r, message = FALSE}
 # Define the base directory
-base_dir <- "/home/arog/Documents/2_semestre/ECDB/project_data"  # Change this to your desired path
+base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"  # Change this to your desired path
 
 # Create directory if it doesn't exist
 if (!dir.exists(base_dir)) {
@@ -167,10 +167,151 @@ The **TCGA-LUAD (The Cancer Genome Atlas - Lung Adenocarcinoma) project** is par
 This study focuses on analyzing **data and metadata** to assess quality, completeness, and usability. By examining metadata, we evaluate its role in ensuring data consistency, accessibility, and interoperability for research applications.  
 
 
+### Objective
+
+This project aims to:
+
+- Identify differentially expressed genes (DEGs) in LUAD
+- Investigate associations between gene expression and clinical variables
+- Discover biomarkers or gene signatures for prognosis or treatment
+
 ## Data Pre Processing
 
-## Data Summary
+In this stage, we preprocess the dataset to ensure its quality for differential expression and enrichment analysis. First, we separate the gene expression data from the metadata, structuring the dataset for efficient analysis. Then, we apply filtering techniques to remove noise, retaining only biologically relevant information that will enhance the accuracy of downstream analyses.
 
-## Statistical and Functional Data Analysis
+
+```{r}
+# Extract gene expression matrix
+expression_data <- as.data.frame(assay(rna_seq_LUAD))
+
+# Extract clinical metadata
+clinical_data <- colData(rna_seq_LUAD)
+
+# Check the first few rows of each dataset
+head(expression_data)[,1:5]  
+head(clinical_data)
+
+```
+
+###Initial Data Exploration
+
+```{r}
+# Filter genes with low expression
+keep_genes <- rowSums(expression_data > 1) > ncol(expression_data) * 0.5
+expression_filtered <- expression_data[keep_genes, ]
+
+cat("Dimensions:", dim(rna_seq_LUAD)[1], "genes x", dim(rna_seq_LUAD)[2], "samples\n")
+
+# Summaries
+summary(expression_filtered[1:5, 1:5])  
+summary(clinical_data)
+
+cat("Genes:", nrow(expression_filtered), "\n")
+cat("Samples:", ncol(expression_filtered), "\n")
+
+# Gene-wise statistics
+gene_stats <- data.frame(
+  Mean = rowMeans(expression_filtered),
+  SD = apply(expression_filtered, 1, sd)
+)
+summary(gene_stats)
+```
+
+#### Gene and Sample Metadata
+
+```{r}
+gene_metadata <- rowData(rna_seq_LUAD)
+sample_metadata <- colData(rna_seq_LUAD)
+cat("Gene metadata:", dim(gene_metadata), "\n")
+cat("Sample metadata:", dim(sample_metadata), "\n")
+```
+
+### Missing Values (NA)
+
+We analyze missing values in the dataset to identify patterns, assess their impact, and determine the best approach for handling them, ensuring data integrity for further analysis.
+
+```{r}
+# For expression_data (gene expression matrix)
+percent_missing_expression = colSums(is.na(expression_data)) / nrow(expression_data) * 100
+
+# For clinical_data (clinical_data)
+percent_missing_clinical = colSums(is.na(clinical_data)) / nrow(clinical_data) * 100
+
+percent_missing_expression
+percent_missing_clinical
+```
+There were no NAs for the `gene expression matrix`. In the `clinical_data` some values are missing (NA). We need to remove or impute these values to avoid bias.
+
+```{r}
+columns_with_na = names(clinical_data)[colSums(is.na(clinical_data)) > 0]
+
+# Variables with NAs
+print(columns_with_na)
+
+```
+
+A table was created listing the variables and their corresponding missing values (NAs) to help identify which variables were selected for this analysis.
+
+```{r}
+tabela_nas = data.frame(Variável = names(clinical_data), 
+                         Total_NAs = colSums(is.na(clinical_data)))
+
+print(tabela_nas)
+```
+
+As a general rule in data preprocessing, variables with a high proportion of missing values can introduce bias or reduce the power of statistical analyses. Therefore, we chose to exclude variables with more than 30% missing values. This threshold strikes a balance between preserving as much data as possible while ensuring that the retained variables are informative and complete enough for meaningful analysis.
+By applying this filter, we focused the dataset on the most relevant and reliable features, which will improve the robustness of the downstream statistical and bioinformatic analyses.
+
+
+```{r}
+# Set the NA threshold
+threshold = 30  # in percent
+
+# For gene expression data
+expression_data_filtered = expression_data[, percent_missing_expression <= threshold]
+
+# For clinical data
+clinical_data_filtered = clinical_data[, percent_missing_clinical <= threshold]
+
+expression_data_filtered
+clinical_data_filtered
+
+columns_with_no_na = names(clinical_data_filtered)[colSums(clinical_data_filtered)]
+columns_with_no_na
+```
+
+
+To ensure the reliability of downstream analyses, genes with low expression across the majority of samples were filtered out. Specifically, only genes with counts greater than 1 in more than 50% of the samples were retained. This step helps reduce noise from lowly expressed or non-informative genes.
+
+```{r}
+# Keep only genes where at least 50% of samples have counts >1
+keep = rowSums(expression_data > 1) > (0.5 * ncol(expression_data))
+filtered_data = expression_data[keep, ]
+
+```
+
+
+1  PARTE - CATARINA
+
+-LIMPAR DADOS
+-FAZER MERGE
+
+2.1 PARTE - CATARINA   
+-FAZER CONTEXTUALIZACAO
+
+
+
+2.2 PARTE - MARIA
+-INTERPRETACAO DAS CENAS DA CATARINA (SUMMARIES)
+-ESCOLHER AS 5 VARIAVEIS 
+ -CONTEXTUALIZACAO DAS 5   (ESTATISTICAS DESCRITIVAS)
+-APAGAR SAMPLES DE NAS
+
+
+3  PARTE - ARTUR
+-CLUSTERING
+
+4 PARTE - CATARINA
+-ANALISE DE EXPRESSAO DIFERENCIAL
 
 
