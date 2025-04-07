@@ -162,18 +162,35 @@ if (!file.exists(rna_seq_file)) {
 
 ## Contextualization of the Data
 
-The **TCGA-LUAD (The Cancer Genome Atlas - Lung Adenocarcinoma) project** is part of the Genomic Data Commons (GDC), aimed at characterizing lung adenocarcinoma at the molecular level. It provides **clinical, genomic, and molecular** data, including patient demographics, tumor characteristics, sequencing data, and protein expression profiles.  
+The **TCGA-LUAD (The Cancer Genome Atlas - Lung Adenocarcinoma) project** is part of the Genomic Data Commons (GDC), aimed at characterizing lung adenocarcinoma at the molecular level. It provides **clinical, genomic, and molecular** data, including patient demographics, tumor characteristics, sequencing data, and protein expression profiles.
 
-This study focuses on analyzing **data and metadata** to assess quality, completeness, and usability. By examining metadata, we evaluate its role in ensuring data consistency, accessibility, and interoperability for research applications.  
+### Dataset Composition
 
+The TCGA-LUAD collection encompasses **600 lung adenocarcinoma samples** with extensive molecular profiling. The transcriptomic data captures expression levels for approximately **60,000 genes**, providing unprecedented breadth in molecular characterization. Following rigorous quality control and preprocessing procedures, **27,326 genes** were retained for downstream analysis, ensuring both data quality and comprehensive coverage of the transcriptome.
 
-### Objective
+### Research Focus
+
+This study focuses on analyzing **data and metadata** to assess quality, completeness, and usability. By examining metadata, we evaluate its role in ensuring data consistency, accessibility, and interoperability for research applications.
+
+### Objectives
 
 This project aims to:
-
 - Identify differentially expressed genes (DEGs) in LUAD
 - Investigate associations between gene expression and clinical variables
 - Discover biomarkers or gene signatures for prognosis or treatment
+
+### Research Applications
+
+The richness and scale of this dataset make it an invaluable resource for:
+1. **Expression Profiling**: Mapping transcriptional activity across the genome in lung adenocarcinoma
+2. **Molecular Subtyping**: Classifying tumors into distinct biological and clinical entities
+3. **Pathway Analysis**: Investigating dysregulated biological pathways driving LUAD development
+4. **Integrative Analysis**: Combining transcriptomic data with other molecular layers and clinical information
+
+### Significance in Lung Cancer Research
+
+The comprehensive nature of the TCGA-LUAD dataset supports efforts in understanding the molecular mechanisms driving lung adenocarcinoma and developing personalized therapeutic strategies. By integrating clinical variables with genomic data, this resource enables a multidimensional approach to investigating one of the most common and lethal cancer subtypes.
+
 
 ## Data Pre Processing
 
