@@ -123,7 +123,7 @@ The **`GDCdownload()`** function is then used to download the data according to 
 
 ```{r, message = FALSE}
 # Define the base directory
-base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"  # Change this to your desired path
+base_dir <- "/Users/mariacarvalho/Desktop/Mestrado/2º\ semestre/Extração"  # Change this to your desired path
 
 # Create directory if it doesn't exist
 if (!dir.exists(base_dir)) {
@@ -155,6 +155,7 @@ if (!file.exists(rna_seq_file)) {
 
 } else {
   rna_seq_LUAD <- get(load(rna_seq_file))
+  rm(data)
 }
 
 ```
@@ -287,8 +288,137 @@ threshold = 30  # in percent
 # For clinical data
 clinical_data_filtered = clinical_data[, percent_missing_clinical <= threshold]
 
-columns_with_no_na = names(clinical_data_filtered)[colSums(clinical_data_filtered)]
+columns_with_no_na <- names(clinical_data_filtered)[colSums(is.na(clinical_data_filtered)) == 0]
+
 columns_with_no_na
+```
+After filtering the variables, we selected the following as our feature variables:
+  `gender` : Biological sex of the patient (Male or Female --> Categorical Variable). Can influence disease prevalence and progression.
+  
+```{r}
+## GENDER
+
+barplot(table(clinical_data_filtered@listData[["gender"]]), 
+        main = "Distribution of Gender", 
+        xlab = "Gender", 
+        ylab = "Count", 
+        col = c("pink", "slategray1")[match(names(table(clinical_data_filtered@listData[["gender"]])), c("female", "male"))],
+          border = "white")
+
+```
+  
+  `race`: Self-reported racial background of the patient (Asian, American indian or Alaska native, Black or African American, White, Not Reported, Unknown --> Categorical Variable). May reflect epidemiological or socio-demographic patterns.
+```{r}
+## RACE
+
+race_data <- clinical_data_filtered@listData[["race"]]
+race_table <- table(race_data)
+
+
+race_percent <- prop.table(race_table) * 100
+
+race_df <- data.frame(
+  Race = names(race_table),
+  Count = as.vector(race_table),
+  Percentage = round(as.vector(race_percent), 1)
+)
+
+print(race_df)
+
+
+
+```
+  Since the majority of patients are White (77.7%) or Black/African American (9.8%), and all other racial groups represent less than 2% each, we chose to focus our analysis on these two groups to ensure statistical relevance and interpretability.
+  
+```{r}
+# Keep only rows where race is white or black or african american
+clinical_data_filtered <- clinical_data_filtered[
+  clinical_data_filtered@listData[["race"]] %in% c("white", "black or african american"),]
+```
+
+```{r}
+barplot(table(clinical_data_filtered@listData[["race"]]),
+        main = "Distribution of Race",
+        xlab = "Race",
+        ylab = "Count",
+        col = c("lightseagreen", "salmon"),
+          border = "white")
+```
+  `age_at_diagnosis`: Age of the patient at the time of initial diagnosis (In days --> Numerical Variable).
+```{r}
+
+age_in_years <- clinical_data_filtered@listData[["age_at_diagnosis"]] / 365.25
+
+hist(age_in_years,
+     main = "Age at Diagnosis Distribution",
+     xlab = "Age",
+     col = "snow3",
+     breaks = 30,
+       border = "white")  # adjust for bin size
+
+```
+  `primary_diagnosis`: Main clinical diagnosis assigned to the patient (Type of tumor --> Categorical Variable). Will help us understand if the type of the tumor will have influence in our response variable.
+
+```{r}
+diagnosis_data <- clinical_data_filtered@listData[["primary_diagnosis"]]
+diagnosis_table <- table(diagnosis_data)
+diagnosis_percent <- prop.table(diagnosis_table) * 100
+diagnosis_percent
+```
+Since the majority of cases are concentrated in Adenocarcinoma, NOS (56.19%) and Adenocarcinoma with mixed subtypes (14.48%), and the other tumor types each represent less than 1%, with the 'Not Reported' category also being excluded, we will focus our analysis on these two tumor types to ensure statistical relevance and improve the interpretability of the results.
+```{r}
+# Filter out diagnoses with percentages < 1%
+filtered_diagnosis <- diagnosis_percent[diagnosis_percent >= 1]
+
+# Remove "Not Reported" from filtered diagnoses
+final_diagnosis <- filtered_diagnosis[names(filtered_diagnosis) != "Not Reported"]
+
+# View the final filtered data
+final_diagnosis
+
+```
+
+
+```{r}
+
+# Set colors (1 per type)
+
+colors <- c("#6A0572", "#9D0191", "#FF6464", "#FFAB73", "#FFC93C", "#F9F871")
+
+
+# Plot
+# Example of a pie chart
+pie(
+  final_diagnosis,
+  main = "Primary Diagnosis",
+  col = colors,
+  border = "white"
+)
+
+```
+
+  
+  `tissue_type`: Indicates the type of sample (Tumor, Normal --> Categorical Variable). Useful for distinguishing between diseased and control samples.
+  
+```{r}
+barplot(table(clinical_data_filtered@listData[["tissue_type"]]),
+        main = "Distribution of Tissue Type",
+        xlab = "Tissue Type",
+        ylab = "Count",
+        col = c("forestgreen", "darkred"),
+          border = "white")
+```
+  
+The response variable chosen is: `vital_status`. Indicates whether the patient is Alive or Dead at follow-up (Categorical Variable). It has a binary classification target. For us it will be useful for survival outcome prediction.
+
+```{r}
+barplot(table(clinical_data_filtered@listData[["vital_status"]]),
+        main = "Distribution of Vital Status",
+        xlab = "Vital Status",
+        ylab = "Count",
+        col = c("plum", "plum4"),
+          border = "white")
+
 ```
 
 
