@@ -284,14 +284,8 @@ By applying this filter, we focused the dataset on the most relevant and reliabl
 # Set the NA threshold
 threshold = 30  # in percent
 
-# For gene expression data
-expression_data_filtered = expression_data[, percent_missing_expression <= threshold]
-
 # For clinical data
 clinical_data_filtered = clinical_data[, percent_missing_clinical <= threshold]
-
-expression_data_filtered
-clinical_data_filtered
 
 columns_with_no_na = names(clinical_data_filtered)[colSums(clinical_data_filtered)]
 columns_with_no_na
