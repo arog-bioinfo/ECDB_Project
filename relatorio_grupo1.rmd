@@ -163,6 +163,10 @@ if (!file.exists(rna_seq_file)) {
 
 ## Contextualization of the Data
 
+Lung adenocarcinoma is the most common form of lung cancer and is classified as a subtype of non-small cell lung cancer (NSCLC), representing about 40% of all lung cancer cases. It arises from the glandular cells of the lungs, which are responsible for producing mucus and lining the alveoli and other lung structures. This type of cancer typically develops in the outer, peripheral regions of the lungs and is known for its relatively slow growth compared to other lung cancer types [1][2].
+Although there is a strong association with smoking, lung adenocarcinoma is also commonly found in non-smokers, particularly in younger women and individuals of Asian descent. It often emerges in areas of the lung affected by scarring or chronic inflammation. Early symptoms may be mild or vague, including fatigue, shortness of breath, or chest discomfort. As the disease advances, more pronounced signs can develop, such as a persistent cough, coughing up blood, and severe difficulty breathing [3][4].
+The prognosis varies depending on the stage at diagnosis and response to treatment. Early detection improves survival rates significantly, while advanced cases may require multimodal therapies for disease management [2][4].
+
 The **TCGA-LUAD (The Cancer Genome Atlas - Lung Adenocarcinoma) project** is part of the Genomic Data Commons (GDC), aimed at characterizing lung adenocarcinoma at the molecular level. It provides **clinical, genomic, and molecular** data, including patient demographics, tumor characteristics, sequencing data, and protein expression profiles.
 
 ### Dataset Composition
@@ -214,19 +218,37 @@ head(clinical_data)
 ###Initial Data Exploration
 
 ```{r}
-# Filter genes with low expression
-keep_genes <- rowSums(expression_data > 1) > ncol(expression_data) * 0.5
-expression_filtered <- expression_data[keep_genes, ]
+## SUMMARIZEDEXPERIMENT
 
-cat("Dimensions:", dim(rna_seq_LUAD)[1], "genes x", dim(rna_seq_LUAD)[2], "samples\n")
+metadata_rows = SummarizedExperiment::rowData(rna_seq_LUAD)
+metadata_col = SummarizedExperiment::colData(rna_seq_LUAD)
 
+metadata_rows   # DataFrame with 60660 rows and 10 columns
+metadata_col    # DataFrame with 600 rows and 93 columns
+```
+
+Based on the exploration of the dataset, we can confirm that it is a SummarizedExperiment object composed of 60,660 rows and 600 columns. The rows correspond to individual genes, and each gene is annotated with 10 metadata fields. One of the key identifiers among these is the gene_id, which provides a unique Ensembl reference for each gene.
+In contrast, the columns represent 600 biological samples, each described by 93 metadata variables. These metadata fields contain rich information about the samples — such as clinical, demographic, or experimental attributes — which are essential for investigating how various sample characteristics influence gene expression.
+It’s also worth noting that the structure of the metadata changes when accessed directly: in the gene metadata (rowData), rows are indexed by gene identifiers; whereas in the sample metadata (colData), rows are indexed by sample IDs. This format makes it easier to analyze and query gene- or sample-specific information independently.
+
+
+```{r}
 # Summaries
-summary(expression_filtered[1:5, 1:5])  
+summary(expression_filtered[1:5, 1:5])  # first 5 rows and first 5 columns
 summary(clinical_data)
 
-cat("Genes:", nrow(expression_filtered), "\n")
-cat("Samples:", ncol(expression_filtered), "\n")
+head(rownames(expression_filtered), 5)
 
+cat("Genes:", nrow(expression_filtered), "\n") 
+cat("Samples:", ncol(expression_filtered), "\n")
+```
+First five columns of the `expression_filtered`: TCGA-44-2665-01A; TCGA-97-7937-01A; TCGA-44-2665-11A; TCGA-44-2665-01B; TCGA-64-5774-01A
+
+First five rows of the `expression_filtered`: ENSG00000000003.15; ENSG00000000419.13; ENSG00000000457.14; ENSG00000000460.17; ENSG00000000938.13
+
+There are 27326 genes and 600 samples in the `expression_filtered` database.
+
+```{r}
 # Gene-wise statistics
 gene_stats <- data.frame(
   Mean = rowMeans(expression_filtered),
@@ -234,6 +256,10 @@ gene_stats <- data.frame(
 )
 summary(gene_stats)
 ```
+    There's a high variability in both the mean expression and standard deviation values across genes.
+    The mean > median and high maximum values suggest a right-skewed distribution, likely driven by a few highly expressed genes.
+    The wide range in SD also indicates heterogeneity in gene expression stability, which could help in selecting highly variable genes for downstream analysis (e.g., clustering or PCA).
+
 
 #### Gene and Sample Metadata
 
@@ -314,7 +340,6 @@ barplot(table(clinical_data_filtered@listData[["gender"]]),
 race_data <- clinical_data_filtered@listData[["race"]]
 race_table <- table(race_data)
 
-
 race_percent <- prop.table(race_table) * 100
 
 race_df <- data.frame(
@@ -324,9 +349,6 @@ race_df <- data.frame(
 )
 
 print(race_df)
-
-
-
 ```
   Since the majority of patients are White (77.7%) or Black/African American (9.8%), and all other racial groups represent less than 2% each, we chose to focus our analysis on these two groups to ensure statistical relevance and interpretability.
   
@@ -380,14 +402,8 @@ final_diagnosis
 
 
 ```{r}
-
-# Set colors (1 per type)
-
 colors <- c("#6A0572", "#9D0191", "#FF6464", "#FFAB73", "#FFC93C", "#F9F871")
 
-
-# Plot
-# Example of a pie chart
 pie(
   final_diagnosis,
   main = "Primary Diagnosis",
@@ -432,27 +448,16 @@ filtered_data = expression_data[keep, ]
 ```
 
 
-1  PARTE - CATARINA
-
--LIMPAR DADOS
--FAZER MERGE
-
-2.1 PARTE - CATARINA   
--FAZER CONTEXTUALIZACAO
 
 
+### Bibliography
 
-2.2 PARTE - MARIA
--INTERPRETACAO DAS CENAS DA CATARINA (SUMMARIES)
--ESCOLHER AS 5 VARIAVEIS 
- -CONTEXTUALIZACAO DAS 5   (ESTATISTICAS DESCRITIVAS)
--APAGAR SAMPLES DE NAS
+1. Myers DJ, Wallen JM. Lung Adenocarcinoma. 2023 Jun 12. In: StatPearls [Internet]. Treasure Island (FL): StatPearls Publishing; 2025 Jan–. PMID: 30137862.
+2. Cancer Treatment Centers of America. (n.d.). Adenocarcinoma of the lung. Cancer Treatment Centers of America. https://www.cancercenter.com/cancer-types/lung-cancer/types/adenocarcinoma-of-the-lung
+3. American Cancer Society. (n.d.). What is lung cancer? American Cancer Society. https://www.cancer.org/cancer/types/lung-cancer/about/what-is.html
+4. Lung Cancer Foundation of America. (n.d.). Adenocarcinoma of the lung: An introduction. Lung Cancer Foundation of America. https://lcfamerica.org/about-lung-cancer/diagnosis/types/adenocarcinoma/
 
 
-3  PARTE - ARTUR
--CLUSTERING
 
-4 PARTE - CATARINA
--ANALISE DE EXPRESSAO DIFERENCIAL
 
 
