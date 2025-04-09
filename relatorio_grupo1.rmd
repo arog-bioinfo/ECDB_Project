@@ -123,7 +123,10 @@ The **`GDCdownload()`** function is then used to download the data according to 
 
 ```{r, message = FALSE}
 # Define the base directory
-base_dir <- "/Users/mariacarvalho/Desktop/Mestrado/2º\ semestre/Extração"  # Change this to your desired path
+#base_dir <- "/Users/mariacarvalho/Desktop/Mestrado/2º\ semestre/Extração"  # Change this to your desired path
+
+base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"
+
 
 # Create directory if it doesn't exist
 if (!dir.exists(base_dir)) {
@@ -432,27 +435,207 @@ filtered_data = expression_data[keep, ]
 ```
 
 
-1  PARTE - CATARINA
+## Differential expression and enrichment analysis
 
--LIMPAR DADOS
--FAZER MERGE
+### Differential expression analysis
+#### DESEQ2
 
-2.1 PARTE - CATARINA   
--FAZER CONTEXTUALIZACAO
-
+In order to analyze the genes that are differentially expressed in the tumor type **“Adenocarcinoma, NOS”** within **Lung Adenocarcinoma** (TCGA, GDC), based on the patients’ vital status, a data pre-processing step was performed to facilitate and optimize the differential expression analysis while reducing computational time and resource usage.
 
 
-2.2 PARTE - MARIA
--INTERPRETACAO DAS CENAS DA CATARINA (SUMMARIES)
--ESCOLHER AS 5 VARIAVEIS 
- -CONTEXTUALIZACAO DAS 5   (ESTATISTICAS DESCRITIVAS)
--APAGAR SAMPLES DE NAS
+```{r}
+final_diagnosis
+
+```
+
+Initially, samples with the primary diagnosis **“Adenocarcinoma, NOS”** were filtered, as only these samples are relevant to our study due to the higher incidence of this cancer subtype. 
 
 
-3  PARTE - ARTUR
--CLUSTERING
+```{r}
+diagnosis_table
 
-4 PARTE - CATARINA
--ANALISE DE EXPRESSAO DIFERENCIAL
+filtered_diagnosis = filtered_diagnosis[final_diagnosis == "Adenocarcinoma, NOS"]
+data_ADC = expression_data[,rownames((filtered_diagnosis))]
+dim(data_ADC)
+```
 
+```{r}
+metadata_col = SummarizedExperiment::colData(rna_seq_LUAD)
+geneExp = SummarizedExperiment::assay(rna_seq_LUAD, "unstranded")
+
+filtered_data = metadata_col[!is.na(metadata_col$primary_diagnosis),]
+filtered_data = filtered_data[filtered_data$primary_diagnosis=="Adenocarcinoma, NOS",]
+
+ADC_data = geneExp[,rownames(filtered_data)]
+dim(ADC_data)
+
+```
+The dataset still contained 60,660 genes, because there weren´t any missing values found in the gene expressio, on the previous analysis. Therefore, an additional filtering step was necessary to remove genes with no expression (i.e., genes that have zero counts across all samples). Furthermore, genes with very low expression were also removed, as they typically do not provide meaningful insights in differential expression analysis. To achieve this, genes were excluded if they did not have at least 20 counts in at least 4 samples. These filtering thresholds are considered standard according to the DESeq2 workflow documentation.
+
+
+```{r}
+sum(is.na(filtered_data$vital_status))
+```
+ Next, we checked for missing values in the **vital status** column. Since no missing values were found, the “vital_status” metadata was converted into a factor, as the differential expression analysis using the **DESeq2** package recommends using factors instead of character variables.
+ 
+```{r}
+filtered_data$vital_status = factor(filtered_data$vital_status)
+
+
+ddsSE = DESeqDataSetFromMatrix(countData = ADC_data, colData = filtered_data, design = ~vital_status)
+
+
+# filtragem de genes com menos de 20 ocorrências em pelo menos 4 amostras
+keep_genes = rowSums(counts(ddsSE) >= 20) >= 4
+ddsSE = ddsSE[keep_genes, ]
+dim(ddsSE)
+
+```
+After the preprocessing steps, the final dataset included approximately **33,293 genes** and **323 samples**. With this filtered dataset, we created the **DESeqDataSet** object, using the “vital_status” factor as the explanatory variable in the model.
+
+```{r}
+ddsSE_norm = DESeq(ddsSE)
+res = results(ddsSE_norm, alpha = 0.05)
+
+summary(res) # summary of differential expression test results
+```
+```{r}
+sum(res$padj < 0.05, na.rm=TRUE) # Total number of genes with differential expression
+```
+Differential gene expression analysis was performed using DESeq2 on a dataset comprising 33,293 genes with non-zero read counts. Throughout the analysis pipeline, standard steps such as normalization via size factor estimation, dispersion estimation, and model fitting were carried out. Gene-specific dispersion estimates were refined through modeling the mean-dispersion relationship, and outliers were identified and replaced for 8,521 genes, provided that the minimum number of replicates (set to 7) was met. Importantly, all original counts were preserved for reference.
+
+Following model fitting and hypothesis testing, a total of 5,994 genes were found to be differentially expressed with an adjusted p-value below 0.05. Among these, 1,496 genes (approximately 4.5% of the total) were significantly upregulated, while 4,498 genes (14%) were downregulated. Notably, no genes were removed due to outlier filtering or low counts, indicating the robustness of the dataset and the strength of the detected expression changes.
+
+This analysis highlights a considerable shift in gene expression, particularly toward downregulation, which may reflect underlying biological processes or responses in the studied conditions.
+
+```{r}
+#  graphical display of results
+DESeq2::plotMA(res, main="DESeq2 differential expression analysis")
+plotCounts(ddsSE_norm, gene=which.min(res$padj), intgroup="vital_status", pch = 19)
+
+```
+
+
+```{r}
+plotCounts(ddsSE_norm, gene=which.min(res$padj), intgroup="vital_status", pch = 19)
+
+resOrdered = res[order(res$padj),]
+resOrdered[1,]
+```
+
+Differential expression analysis revealed that approximately 19% of genes were significantly altered between the "Alive" and "Dead" groups, with a clear trend toward downregulation. This pattern was supported by the MA plot, which showed a greater number of genes with negative fold changes.
+
+Further exploration of individual genes through boxplots provided additional insight. The gene ENSG00000162374.18 exhibited slightly lower and more variable expression levels in the "Dead" group, suggesting potential regulatory differences. In contrast, ENSG00000202538.1 showed high expression in both groups but with reduced variability among "Dead" samples, possibly indicating more uniform gene regulation in that condition.
+
+Together, these observations support the global trend identified in the analysis and highlight genes that may be biologically relevant in the context of survival.
+
+### Enrichment analysis
+
+```{r}
+vital_status = as.factor(filtered_data$vital_status)
+design = model.matrix(~vital_status)
+
+dgeObj = estimateDisp(dgeObj, design = design)
+
+
+fit = glmFit(dgeObj, design)
+
+lrt = glmLRT(fit, coef=2)
+topTags(lrt)
+
+
+# informação acerca dos genes (subexpressos, não significativo, sobreexpresso)
+summary(decideTests(lrt))
+
+# visualização gráfica dos genes diferencialmente expressos
+plotMD(lrt)
+abline(h=c(-1, 1), col="lightpink3")
+
+
+# glmTreat é usado para filtrar os genes DE e focar apenas nos genes que são mais biologicamente significativos
+# filtrar os genes diferencialmente expressos com maior importância biológica
+filtered_results = glmTreat(fit, lfc=log2(1.5))
+topTags(filtered_results)
+
+
+summary(decideTests(filtered_results))
+plotMD(filtered_results)
+abline(h=c(-1, 1), col="lightpink4")
+
+# análise da expressão diferencial dos genes mais comumente mutados https://tcr.amegroups.org/article/view/46888/html
+#PTEN(>77%), PIK3CA (53%), PIK3R1 (37%), CTNNB1 (36%), ARID1A (35%), K-RAS (24%), CTCF (20%)
+#RPL22 (12%), TP53 (11%), FGFR2 (11%), and ARID5B (11%).
+
+ALTERAR
+mutant_genes = c("ENSG00000171862.11", "ENSG00000121879.6", "ENSG00000145675.15", "ENSG00000168036.18",
+                  "ENSG00000117713.20", "ENSG00000133703.13", "ENSG00000102974.16", "ENSG00000116251.11",
+                  "ENSG00000141510.18", "ENSG00000066468.23", "ENSG00000150347.16")
+
+n_gene_edgeR=c()
+for (gene in mutant_genes){
+  n_gene_edgeR=c(n_gene_edgeR, which(rownames(filtered_results)==gene))
+}
+filtered_results[n_gene_edgeR,]$table
+
+
+n_gene_DESeq2=c()
+for (gene in mutant_genes){
+  n_gene_DESeq2=c(n_gene_DESeq2, which(rownames(resultados)==gene))
+}
+resultados[n_gene_DESeq2,]
+
+
+# analise dos genes do estudo sinalizados como diferencialmente expressos
+ALTERAR GENE_ID
+plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000121879.6"), intgroup="vital_status", pch = 19)
+plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000133703.13"), intgroup="vital_status", pch = 19)
+
+
+# enriquecimento Ricardo
+# extração do nome de cada gene
+gene_name=c()
+for (gene in rownames(res)) {
+  gene_name =c(gene_name,linhas_metadados[gene,"gene_name"])
+}
+
+
+# adição do nome de cada gene ao dataframe dos resultados da expressão diferencial
+res["gene_name"] =gene_name
+
+# salvar o data frame resultados
+write.csv(res, file = "dge_deseq2.csv", row.names = T)
+
+# carregamento do grupo de genes para a análise de enriquecimento
+path = gmtPathways("h.all.v2023.2.Hs.symbols.gmt") --> ALTERAR
+# Ordena os resultados pela alteração na expressão em ordem decrescente
+results_ord = res[order(-res[,"log2FoldChange"]), ]
+# Prepara os rankings para a FGSEA
+ranks = results_ord$log2FoldChange
+# associa às linhas o nome do gene
+names(ranks) = results_ord$gene_name
+# Identificar genes duplicados
+duplicated_genes = names(ranks)[duplicated(names(ranks))]
+# Remover genes duplicados
+ranks = ranks[!names(ranks) %in% duplicated_genes]
+
+
+# Executar a análise FGSEA com os genes não duplicados
+fgseaRes = fgsea(pathways = path, stats = ranks, minSize = 15, maxSize = 500, nproc=1)
+# número de vias enriquecidas
+sum(fgseaRes[, padj<0.01])
+
+res_ord = fgseaRes[order(padj),]
+res_ord[res_ord[, padj<0.01]]
+
+#salvar o resultado da análise de enriquecimento ordenado
+write.csv(as.data.frame(res_ord[,1:6]), file = "enrichemnt_analysiss.csv", row.names = T)
+
+# leitura dos resultados da análise de enriquecimento
+enrichment = enrichemnt_analysiss <- read.csv("enrichemnt_analysiss.csv", row.names=1)
+
+# através do ficheiro csv número de vias enriquecidas
+sum(enrichment$padj<0.01)
+
+head(enrichment)
+```
 
