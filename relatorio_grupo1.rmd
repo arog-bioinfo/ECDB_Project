@@ -167,7 +167,12 @@ if (!file.exists(rna_seq_file)) {
 
 ## Contextualization of the Data
 
+Lung adenocarcinoma is the most common form of lung cancer and is classified as a subtype of non-small cell lung cancer (NSCLC), representing about 40% of all lung cancer cases. It arises from the glandular cells of the lungs, which are responsible for producing mucus and lining the alveoli and other lung structures. This type of cancer typically develops in the outer, peripheral regions of the lungs and is known for its relatively slow growth compared to other lung cancer types [1][2].
+Although there is a strong association with smoking, lung adenocarcinoma is also commonly found in non-smokers, particularly in younger women and individuals of Asian descent. It often emerges in areas of the lung affected by scarring or chronic inflammation. Early symptoms may be mild or vague, including fatigue, shortness of breath, or chest discomfort. As the disease advances, more pronounced signs can develop, such as a persistent cough, coughing up blood, and severe difficulty breathing [3][4].
+The prognosis varies depending on the stage at diagnosis and response to treatment. Early detection improves survival rates significantly, while advanced cases may require multimodal therapies for disease management [2][4].
+
 The **TCGA-LUAD (The Cancer Genome Atlas - Lung Adenocarcinoma) project** is part of the Genomic Data Commons (GDC), aimed at characterizing lung adenocarcinoma at the molecular level. It provides **clinical, genomic, and molecular** data, including patient demographics, tumor characteristics, sequencing data, and protein expression profiles.
+
 
 ### Dataset Composition
 
@@ -1050,6 +1055,13 @@ sum(enrichment$padj<0.01)
 head(enrichment)
 ```
 
+
+### Bibliography
+
+1. Myers DJ, Wallen JM. Lung Adenocarcinoma. 2023 Jun 12. In: StatPearls [Internet]. Treasure Island (FL): StatPearls Publishing; 2025 Jan–. PMID: 30137862.
+2. Cancer Treatment Centers of America. (n.d.). Adenocarcinoma of the lung. Cancer Treatment Centers of America. https://www.cancercenter.com/cancer-types/lung-cancer/types/adenocarcinoma-of-the-lung
+3. American Cancer Society. (n.d.). What is lung cancer? American Cancer Society. https://www.cancer.org/cancer/types/lung-cancer/about/what-is.html
+4. Lung Cancer Foundation of America. (n.d.). Adenocarcinoma of the lung: An introduction. Lung Cancer Foundation of America. https://lcfamerica.org/about-lung-cancer/diagnosis/types/adenocarcinoma/
 
 
 
