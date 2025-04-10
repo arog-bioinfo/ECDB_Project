@@ -167,7 +167,12 @@ if (!file.exists(rna_seq_file)) {
 
 ## Contextualization of the Data
 
+Lung adenocarcinoma is the most common form of lung cancer and is classified as a subtype of non-small cell lung cancer (NSCLC), representing about 40% of all lung cancer cases. It arises from the glandular cells of the lungs, which are responsible for producing mucus and lining the alveoli and other lung structures. This type of cancer typically develops in the outer, peripheral regions of the lungs and is known for its relatively slow growth compared to other lung cancer types [1][2].
+Although there is a strong association with smoking, lung adenocarcinoma is also commonly found in non-smokers, particularly in younger women and individuals of Asian descent. It often emerges in areas of the lung affected by scarring or chronic inflammation. Early symptoms may be mild or vague, including fatigue, shortness of breath, or chest discomfort. As the disease advances, more pronounced signs can develop, such as a persistent cough, coughing up blood, and severe difficulty breathing [3][4].
+The prognosis varies depending on the stage at diagnosis and response to treatment. Early detection improves survival rates significantly, while advanced cases may require multimodal therapies for disease management [2][4].
+
 The **TCGA-LUAD (The Cancer Genome Atlas - Lung Adenocarcinoma) project** is part of the Genomic Data Commons (GDC), aimed at characterizing lung adenocarcinoma at the molecular level. It provides **clinical, genomic, and molecular** data, including patient demographics, tumor characteristics, sequencing data, and protein expression profiles.
+
 
 ### Dataset Composition
 
@@ -667,18 +672,21 @@ ADC_data = geneExp[,rownames(filtered_data)]
 dim(ADC_data)
 
 ```
-The dataset still contained 60,660 genes, because there weren´t any missing values found in the gene expressio, on the previous analysis. Therefore, an additional filtering step was necessary to remove genes with no expression (i.e., genes that have zero counts across all samples). Furthermore, genes with very low expression were also removed, as they typically do not provide meaningful insights in differential expression analysis. To achieve this, genes were excluded if they did not have at least 20 counts in at least 4 samples. These filtering thresholds are considered standard according to the DESeq2 workflow documentation.
+After subsetting the dataset to include only samples with a primary diagnosis of "Adenocarcinoma, NOS", the gene expression matrix (ADC_data) contained **60,660 genes**. Since there were no missing values in the expression data, all annotated genes were initially retained. However, many of these genes either showed no expression or had consistently low expression across the samples, which can introduce noise in downstream analyses. To address this, an additional filtering step was applied to remove genes with zero counts across all samples, as well as those with fewer than 20 counts in fewer than 4 samples. These filtering criteria follow standard guidelines from the DESeq2 workflow, ensuring that only genes with sufficient expression are retained for meaningful differential expression analysis.
 
+
+Next, we checked for missing values in the **vital status** column. 
 
 ```{r}
 sum(is.na(filtered_data$vital_status))
-```
- Next, we checked for missing values in the **vital status** column. Since no missing values were found, the “vital_status” metadata was converted into a factor, as the differential expression analysis using the **DESeq2** package recommends using factors instead of character variables.
- 
-```{r}
 filtered_data$vital_status = factor(filtered_data$vital_status)
+```
+Since no missing values were found, the “vital_status” metadata was converted into a factor, as the differential expression analysis using the **DESeq2** package recommends using factors instead of character variables.
 
+After the preprocessing steps, the final dataset included approximately **33,293 genes** and **323 samples**. With this filtered dataset, we created the **DESeqDataSet** object, using the “vital_status” factor as the explanatory variable in the model.
+This analysis used a significance threshold of α = 0.05 to identify genes differentially expressed between vital status groups.
 
+```{r}
 ddsSE = DESeqDataSetFromMatrix(countData = ADC_data, colData = filtered_data, design = ~vital_status)
 
 
@@ -696,56 +704,215 @@ res = results(ddsSE_norm, alpha = 0.05)
 
 summary(res) # summary of differential expression test results
 ```
+
+
 ```{r}
 sum(res$padj < 0.05, na.rm=TRUE) # Total number of genes with differential expression
 ```
-Differential gene expression analysis was performed using DESeq2 on a dataset comprising 33,293 genes with non-zero read counts. Throughout the analysis pipeline, standard steps such as normalization via size factor estimation, dispersion estimation, and model fitting were carried out. Gene-specific dispersion estimates were refined through modeling the mean-dispersion relationship, and outliers were identified and replaced for 8,521 genes, provided that the minimum number of replicates (set to 7) was met. Importantly, all original counts were preserved for reference.
 
-Following model fitting and hypothesis testing, a total of 5,994 genes were found to be differentially expressed with an adjusted p-value below 0.05. Among these, 1,496 genes (approximately 4.5% of the total) were significantly upregulated, while 4,498 genes (14%) were downregulated. Notably, no genes were removed due to outlier filtering or low counts, indicating the robustness of the dataset and the strength of the detected expression changes.
+Differential gene expression analysis was performed using DESeq2 on a dataset comprising **33,293 genes** with non-zero read counts across 323 samples. 
+
+```{r}
+de_gene_count <- sum(res$padj < 0.05, na.rm = TRUE)
+print(de_gene_count)
+```
+
+Following model fitting and hypothesis testing, a total of 5,994 genes were found to be differentially expressed with an adjusted p-value below 0.05. 
 
 This analysis highlights a considerable shift in gene expression, particularly toward downregulation, which may reflect underlying biological processes or responses in the studied conditions.
 
 ```{r}
-#  graphical display of results
-DESeq2::plotMA(res, main="DESeq2 differential expression analysis")
-plotCounts(ddsSE_norm, gene=which.min(res$padj), intgroup="vital_status", pch = 19)
+# Total number of tested genes
+total_genes <- sum(!is.na(res$padj))
+
+# Number of significantly differentially expressed genes (padj < 0.05)
+sig_genes <- sum(res$padj < 0.05, na.rm = TRUE)
+
+# Percentage of DE genes
+percent_DE <- round((sig_genes / total_genes) * 100, 2)
+
+# Among DE genes, count upregulated and downregulated
+upregulated <- sum(res$padj < 0.05 & res$log2FoldChange > 0, na.rm = TRUE)
+downregulated <- sum(res$padj < 0.05 & res$log2FoldChange < 0, na.rm = TRUE)
+
+# Print results
+cat("Total tested genes:", total_genes, "\n")
+cat("Significantly DE genes:", sig_genes, "(", percent_DE, "% )\n")
+cat("Upregulated:", upregulated, "\n")
+cat("Downregulated:", downregulated, "\n")
 
 ```
 
+```{r}
+#  graphical display of results
+DESeq2::plotMA(res, main="DESeq2 differential expression analysis")
+```
+
+Differential expression analysis using DESeq2 identified **5,994 genes** (approximately 18% of the 33,293 tested) as significantly differentially expressed between the "Alive" and "Dead" groups, based on an adjusted p-value (padj) threshold of < 0.05. Of these, **1,496 genes** were significantly upregulated, while **4,498 genes** were downregulated, indicating a strong bias toward decreased expression. This trend was further supported by the MA plot, which revealed a higher density of significantly downregulated genes with negative log2 fold changes. These findings suggest notable shifts in gene expression, potentially reflecting underlying biological mechanisms or regulatory changes associated with the studied condition.
+
 
 ```{r}
+plotCounts(ddsSE_norm, gene=which.min(res$padj), intgroup="vital_status", pch = 19)
 plotCounts(ddsSE_norm, gene=which.min(res$padj), intgroup="vital_status", pch = 19)
 
 resOrdered = res[order(res$padj),]
 resOrdered[1,]
 ```
 
-Differential expression analysis revealed that approximately 19% of genes were significantly altered between the "Alive" and "Dead" groups, with a clear trend toward downregulation. This pattern was supported by the MA plot, which showed a greater number of genes with negative fold changes.
-
-Further exploration of individual genes through boxplots provided additional insight. The gene ENSG00000162374.18 exhibited slightly lower and more variable expression levels in the "Dead" group, suggesting potential regulatory differences. In contrast, ENSG00000202538.1 showed high expression in both groups but with reduced variability among "Dead" samples, possibly indicating more uniform gene regulation in that condition.
+**ENSG00000202538.1** showed high expression in both groups but with reduced variability among "Dead" samples, possibly indicating more uniform gene regulation in that condition.
 
 Together, these observations support the global trend identified in the analysis and highlight genes that may be biologically relevant in the context of survival.
 
+### edgeR
+
+To mitigate biases introduced by differences in sequencing depth or library size, normalization of the raw count data was performed prior to downstream analyses such as differential expression testing. This step is critical to ensure meaningful biological comparisons between samples.
+The `cpm()` function is used to normalize raw count data (ADC_data) by converting it into Counts Per Million (CPM). This method adjusts for differences in library sizes across samples, making the data comparable.
+
+```{r}
+# Normalization of count data
+ADC_data_CPM = cpm(ADC_data)
+dim(ADC_data_CPM)
+```
+The `cpm()` function from the edgeR package was used to convert raw counts in ADC_data into Counts Per Million (CPM). This normalization accounts for library size by scaling the raw counts relative to the total number of reads per sample, multiplied by one million. The resulting ADC_data_CPM matrix contains normalized expression values that are directly comparable across samples. The `dim()` function is then used to inspect the dimensions of the resulting CPM matrix, providing a quick check on the number of genes and samples retained after normalization.
+
+
+To identify genes with meaningful levels of expression, a logical matrix min_exp is created. Each entry in this matrix evaluates whether a gene’s CPM value exceeds 0.5 in a given sample. 
+The rowSums(min_exp) >= 2 condition ensures that only genes with a CPM value greater than 0.5 in at least two samples are retained for further analysis. This filter eliminates genes with minimal or no detectable expression across the dataset, which could otherwise introduce noise or bias into the analysis. The filtered dataset ADC_data_filtered thus contains only those genes deemed reliably expressed, enhancing the robustness and interpretability of subsequent steps.
+
+```{r}
+# Removal of genes that do not have an expression of 0.5 or higher in at least 2 samples 
+min_exp = ADC_data_CPM > 0.5
+keep_rows =  rowSums(min_exp) >= 2
+ADC_data_CPM_filt = ADC_data_CPM[keep_rows,]
+dim(ADC_data_CPM_filt)
+
+```
+
+```{r}
+# Transformation of standardized counts
+dgeObj = DGEList(ADC_data_CPM_filt)
+log_geneExp_filt = cpm(dgeObj, log=TRUE)
+boxplot(log_geneExp_filt[,1:100], xlab="", ylab="Log2 counts per million",las=2)
+abline(h=median(log_geneExp_filt),col="deeppink")
+title("Boxplots of logCPMs (not normalized)")
+```
+
+This boxplot confirms that there is variability in expression distributions across our samples, justifying normalization. It also supports our decision to apply a CPM > 0.5 filter in at least 2 samples, as many genes appear to hover near or below that threshold.
+
+
+```{r}
+# Normalization of the library size of each sample
+dgeObj = calcNormFactors(dgeObj)
+
+```
+After creating the DGEList object dgeObj containing raw count data, normalization factors are calculated using the calcNormFactors() function from the edgeR package. This step accounts for compositional differences between libraries that are not due to sequencing depth alone—such as the presence of a few highly expressed genes in some samples. The method scales the raw counts so that expression levels are comparable across samples, ensuring that observed differences reflect biological variation rather than technical artifacts.
+
+To perform a differential expression analysis, a design matrix is constructed to specify the experimental conditions. 
+```{r}
+# Differential expression analysis
+vital_status = as.factor(filtered_data$vital_status)
+design = model.matrix(~vital_status)
+```
+Here, vital_status ("Alive" vs. "Dead") is extracted from the metadata and converted into a factor to indicate categorical grouping. The model.matrix() function then builds a design matrix based on this grouping, where the intercept represents one condition (the baseline), and the second column represents the contrast of interest. 
+
+
+```{r}
+# To estimate common dispersion, trend dispersion and tag dispersion in a single run
+dgeObj = estimateDisp(dgeObj, design = design)
+
+fit = glmFit(dgeObj, design)
+
+lrt = glmLRT(fit, coef=2)
+topTags(lrt)
+```
+
+`estimateDisp()` estimates three types of dispersion in one step:
+
+    Common dispersion: overall variability across genes.
+    Trend dispersion: dependence of dispersion on gene abundance.
+    Tagwise dispersion: gene-specific dispersion values.
+    
+`glmFit()` fits a negative binomial generalized linear model (GLM) to the count data using the provided design matrix. This model incorporates the estimated dispersions and allows for group-wise comparisons.
+`glmLRT()` performs a likelihood ratio test for differential expression. The coef = 2 argument specifies that the second column of the design matrix is the coefficient being tested.
+`topTags(lrt)` returns a ranked table of genes based on statistical significance, with adjusted p-values (FDR) and log-fold changes, highlighting the most differentially expressed genes between the two groups.
+
+
+```{r}
+#Genes information (underexpressed (down), not significant(NotSig), overexpressed(Up))
+
+summary(decideTests(lrt))
+```
+
+```{r}
+# Graphic visualization of differentially expressed genes
+plotMD(lrt)
+abline(h=c(-1, 1), col="burlywood2")
+```
+
+ There is a much larger cluster of blue points below zero, indicating a strong downregulation trend in the "Dead" group. This aligns with our earlier stat showing 4,498 downregulated genes, compared to only 1,496 upregulated.
+    The density of black points near the logFC = 0 line shows that the majority of genes are not differentially expressed, which is typical in RNA-seq datasets.
+    The horizontal brown lines indicate a fold-change threshold. Genes beyond these lines have substantial expression shifts.
+
+This plot supports the earlier conclusion that the "Dead" group shows a global downregulation pattern compared to the "Alive" group. This could suggest transcriptional repression or loss of cellular function associated with death or disease severity.
+
+```{r}
+# glmTreat is used to filter the DE genes and focus only on the genes that are most biologically significant
+# filter out the differentially expressed genes with the greatest biological importance
+
+filtered_results = glmTreat(fit, lfc=log2(1.5))
+topTags(filtered_results)
+
+
+summary(decideTests(filtered_results))
+plotMD(filtered_results)
+abline(h=c(-1, 1), col="burlywood2")
+```
+
+This version appears to show fewer significantly regulated genes, as seen by the smaller number of red and blue dots.
+    Most points remain concentrated around the zero log-fold-change line, implying that most genes are not significantly different between the Alive and Dead groups.
+    The few upregulated genes (red) cluster on the left side (lower expression), suggesting that significant changes may be occurring in lowly expressed genes.
+    The downregulated genes (blue) also appear mostly in low-expression regions.
+While the trend of downregulation in the "Dead" group still exists, the number of differentially expressed genes is lower, suggesting that after stricter filtering the DE genes and focus only on the genes that are most biologically significant, only the most robust changes are retained.
+
 ### Enrichment analysis
+
+The goal of this section is to identify genes whose expression levels differ significantly between the two clinical conditions ("Alive" vs. "Dead") and prepare the results for downstream enrichment analysis. We use a generalized linear model (GLM) approach implemented in the edgeR package to perform this task.
 
 ```{r}
 vital_status = as.factor(filtered_data$vital_status)
 design = model.matrix(~vital_status)
 
 dgeObj = estimateDisp(dgeObj, design = design)
+
+
 fit = glmFit(dgeObj, design)
 
 lrt = glmLRT(fit, coef=2)
 topTags(lrt)
 
-# informação acerca dos genes (subexpressos, não significativo, sobreexpresso)
+```
+
+    Genes like ENSG00000122585.8 (logFC = 5.7) are highly upregulated in deceased patients — may be linked to disease progression.
+    Genes like ENSG00000138379.5 (logFC = -4.57) are strongly downregulated — could indicate suppressed pathways or protective mechanisms in survivors.
+
+```{r}
+# Genes information (under-expressed, not significant, over-expressed)
 summary(decideTests(lrt))
+```
 
-# visualização gráfica dos genes diferencialmente expressos
+```{r}
+# Graphic visualization of differentially expressed genes
 plotMD(lrt)
-abline(h=c(-1, 1), col="lightpink3")
+abline(h=c(-1, 1), col="lightpink4")
+```
 
+There is a strong downregulation trend in the "dead" group.
 
+    A smaller number of genes are significantly upregulated.
+    Most genes are not significantly differentially expressed (black dots).
+    The MD plot helps quickly visualize this differential expression landscape.
+
+```{r}
 # glmTreat é usado para filtrar os genes DE e focar apenas nos genes que são mais biologicamente significativos
 # filtrar os genes diferencialmente expressos com maior importância biológica
 filtered_results = glmTreat(fit, lfc=log2(1.5))
@@ -755,18 +922,25 @@ topTags(filtered_results)
 summary(decideTests(filtered_results))
 plotMD(filtered_results)
 abline(h=c(-1, 1), col="lightpink4")
+```
 
-# análise da expressão diferencial dos genes mais comumente mutados https://tcr.amegroups.org/article/view/46888/html
-#PTEN(>77%), PIK3CA (53%), PIK3R1 (37%), CTNNB1 (36%), ARID1A (35%), K-RAS (24%), CTCF (20%)
-#RPL22 (12%), TP53 (11%), FGFR2 (11%), and ARID5B (11%).
+1,496 genes are significantly upregulated in "Dead".
+4,498 genes are significantly downregulated in "Dead".
+This still reflects a dominance of downregulation, which may suggest biological suppression or loss of function pathways in individuals with this outcome.
 
-ALTERAR
-mutant_genes = c("ENSG00000171862.11", "ENSG00000121879.6", "ENSG00000145675.15", "ENSG00000168036.18",
-                  "ENSG00000117713.20", "ENSG00000133703.13", "ENSG00000102974.16", "ENSG00000116251.11",
-                  "ENSG00000141510.18", "ENSG00000066468.23", "ENSG00000150347.16")
+    Most genes are not differentially expressed (black).
+    There's a strong downregulation trend in the "Dead" group.
+    This type of plot is crucial in identifying candidate genes for deeper biological or clinical interpretation (e.g., biomarker discovery, pathway enrichment).
+
+Next, the Ensembl IDs of the genes identified in the study were collected and analyzed to determine whether they exhibit differential expression under the conditions being studied.
+The analysis performed using the edgeR package revealed that none of the genes mentioned in the study show differential expression with respect to the “vital_status” variable
+
+```{r}
+# Differential expression analysis of the most commonly mutated genes
+
+mutant_genes = c("ENSG00000138379.5", "ENSG00000122585.8", "ENSG00000122711.9", "ENSG00000204941.14","ENSG00000130055.14", "ENSG00000261742.6", "ENSG00000185269.12", "ENSG00000243137.8","ENSG00000162494.6", "ENSG00000145692.15")
 
 n_gene_edgeR=c()
-
 for (gene in mutant_genes){
   n_gene_edgeR=c(n_gene_edgeR, which(rownames(filtered_results)==gene))
 }
@@ -775,44 +949,92 @@ filtered_results[n_gene_edgeR,]$table
 
 n_gene_DESeq2=c()
 for (gene in mutant_genes){
-  n_gene_DESeq2=c(n_gene_DESeq2, which(rownames(resultados)==gene))
+  n_gene_DESeq2=c(n_gene_DESeq2, which(rownames(res)==gene))
 }
-resultados[n_gene_DESeq2,]
+res[n_gene_DESeq2,]
+
+```
+
+All 10 genes listed are significantly differentially expressed (p-values < 1e-12).
+Fold-changes are large, suggesting biologically meaningful changes, not just statistical.
+There’s a mix of upregulated (positive logFC) and downregulated (negative logFC) genes.
+Genes like ENSG00000122585.8 and ENSG00000204941.14 are **upregulated** in the "Dead" group, suggesting potential association with poor prognosis.
+Genes like ENSG00000138379.5 and ENSG00000122711.9 are **downregulated**, suggesting loss of expression in the "Dead" group.
+
+```{r}
+filtered_res <- res[n_gene_DESeq2, ]
+filtered_res <- filtered_res[filtered_res$padj < 0.05, ]
+filtered_res
+```
+
+All 4 genes show statistically significant differential expression (padj < 0.01).
+
+    3 of them (ENSG00000122711.9, ENSG00000185269.12, ENSG00000145692.15) are downregulated in individuals who are deceased.
+    1 gene (ENSG00000130055.14) is upregulated, though with a moderate fold change.
 
 
-# analise dos genes do estudo sinalizados como diferencialmente expressos
-ALTERAR GENE_ID
-plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000121879.6"), intgroup="vital_status", pch = 19)
-plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000133703.13"), intgroup="vital_status", pch = 19)
+```{r}
+# Analysis of the study genes signaled as differentially expressed
+
+plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000122711.9"), intgroup="vital_status", pch = 19)
+plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000130055.14"), intgroup="vital_status", pch = 19)
+plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000185269.12"), intgroup="vital_status", pch = 19)
+plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000145692.15"), intgroup="vital_status", pch = 19)
+
+```
+
+1. Gene **ENSG00000122711.9** is significantly downregulated in patients who are in the "Dead# group compared to those who are on the "Alive" group, based on normalized counts. This difference is visible in the plot and statistically confirmed by DESeq2.
+
+2. Gene **ENSG00000130055.14** is more highly expressed in the "Dead" group compared to the "Alive" group, suggesting its expression is associated with vital status. Statistical tests were done to confirm this.
+
+3. 
+
+4.
 
 
-# enriquecimento Ricardo
-# extração do nome de cada gene
+```{r}
+# Each gene name
 gene_name=c()
 for (gene in rownames(res)) {
-  gene_name =c(gene_name,linhas_metadados[gene,"gene_name"])
+  gene_name =c(gene_name,
+               gene_metadata[gene,"gene_name"])
 }
 
+```
 
-# adição do nome de cada gene ao dataframe dos resultados da expressão diferencial
-res["gene_name"] =gene_name
+```{r}
+# Adding the name of each gene to the dataframe of the differential expression results
+res["gene_name"] = gene_name
+```
 
-# salvar o data frame resultados
+```{r}
+# save the data frame results
 write.csv(res, file = "dge_deseq2.csv", row.names = T)
+```
 
-# carregamento do grupo de genes para a análise de enriquecimento
-path = gmtPathways("h.all.v2023.2.Hs.symbols.gmt") --> ALTERAR
-# Ordena os resultados pela alteração na expressão em ordem decrescente
-results_ord = res[order(-res[,"log2FoldChange"]), ]
+```{r}
+# Loading the group of genes for enrichment analysis
+path = gmtPathways("/Users/mariacarvalho/c6.all.v2023.2.Hs.symbols.gmt")
+
+
 # Prepara os rankings para a FGSEA
 ranks = results_ord$log2FoldChange
-# associa às linhas o nome do gene
+
+
+# Associates the name of the gene to the lines
 names(ranks) = results_ord$gene_name
+
+# Sorts the results by the change in expression in descending order
+results_ord = res[order(-res[,"log2FoldChange"]), ]
+
+
 # Identificar genes duplicados
 duplicated_genes = names(ranks)[duplicated(names(ranks))]
 # Remover genes duplicados
 ranks = ranks[!names(ranks) %in% duplicated_genes]
+```
 
+```{r}
 
 # Executar a análise FGSEA com os genes não duplicados
 fgseaRes = fgsea(pathways = path, stats = ranks, minSize = 15, maxSize = 500, nproc=1)
@@ -821,16 +1043,36 @@ sum(fgseaRes[, padj<0.01])
 
 res_ord = fgseaRes[order(padj),]
 res_ord[res_ord[, padj<0.01]]
+```
 
+```{r}
 #salvar o resultado da análise de enriquecimento ordenado
 write.csv(as.data.frame(res_ord[,1:6]), file = "enrichemnt_analysiss.csv", row.names = T)
+```
 
+```{r}
 # leitura dos resultados da análise de enriquecimento
 enrichment = enrichemnt_analysiss <- read.csv("enrichemnt_analysiss.csv", row.names=1)
+```
 
+```{r}
 # através do ficheiro csv número de vias enriquecidas
 sum(enrichment$padj<0.01)
 
 head(enrichment)
 ```
 
+
+### Bibliography
+
+1. Myers DJ, Wallen JM. Lung Adenocarcinoma. 2023 Jun 12. In: StatPearls [Internet]. Treasure Island (FL): StatPearls Publishing; 2025 Jan–. PMID: 30137862.
+2. Cancer Treatment Centers of America. (n.d.). Adenocarcinoma of the lung. Cancer Treatment Centers of America. https://www.cancercenter.com/cancer-types/lung-cancer/types/adenocarcinoma-of-the-lung
+3. American Cancer Society. (n.d.). What is lung cancer? American Cancer Society. https://www.cancer.org/cancer/types/lung-cancer/about/what-is.html
+4. Lung Cancer Foundation of America. (n.d.). Adenocarcinoma of the lung: An introduction. Lung Cancer Foundation of America. https://lcfamerica.org/about-lung-cancer/diagnosis/types/adenocarcinoma/
+
+
+
+
+
+
+    
