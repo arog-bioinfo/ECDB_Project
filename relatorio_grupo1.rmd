@@ -123,7 +123,9 @@ The **`GDCdownload()`** function is then used to download the data according to 
 
 ```{r, message = FALSE}
 # Define the base directory
-base_dir <- "/Users/mariacarvalho/Desktop/Mestrado/2º\ semestre/Extração"  # Change this to your desired path
+# base_dir <- "/Users/mariacarvalho/Desktop/Mestrado/2º\ semestre/Extração"  # Change this to your desired path
+base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
+# base_dir <- 
 
 # Create directory if it doesn't exist
 if (!dir.exists(base_dir)) {
@@ -255,7 +257,7 @@ percent_missing_expression = colSums(is.na(expression_data)) / nrow(expression_d
 # For clinical_data (clinical_data)
 percent_missing_clinical = colSums(is.na(clinical_data)) / nrow(clinical_data) * 100
 
-percent_missing_expression
+unique(percent_missing_expression) #Output tem que ser melhor.
 percent_missing_clinical
 ```
 There were no NAs for the `gene expression matrix`. In the `clinical_data` some values are missing (NA). We need to remove or impute these values to avoid bias.
@@ -347,9 +349,9 @@ barplot(table(clinical_data_filtered@listData[["race"]]),
   `age_at_diagnosis`: Age of the patient at the time of initial diagnosis (In days --> Numerical Variable).
 ```{r}
 
-age_in_years <- clinical_data_filtered@listData[["age_at_diagnosis"]] / 365.25
+clinical_data_filtered$age_at_diagnosis <- clinical_data_filtered$age_at_diagnosis / 365.25
 
-hist(age_in_years,
+hist(clinical_data_filtered$age_at_diagnosis,
      main = "Age at Diagnosis Distribution",
      xlab = "Age",
      col = "snow3",
@@ -367,15 +369,15 @@ diagnosis_percent
 ```
 Since the majority of cases are concentrated in Adenocarcinoma, NOS (56.19%) and Adenocarcinoma with mixed subtypes (14.48%), and the other tumor types each represent less than 1%, with the 'Not Reported' category also being excluded, we will focus our analysis on these two tumor types to ensure statistical relevance and improve the interpretability of the results.
 ```{r}
-# Filter out diagnoses with percentages < 1%
-filtered_diagnosis <- diagnosis_percent[diagnosis_percent >= 1]
+# Keep only diagnoses with > 1% frequency
+clinical_data_filtered <- clinical_data_filtered[
+  clinical_data_filtered$primary_diagnosis %in% names(diagnosis_percent[diagnosis_percent > 1]), ]
 
-# Remove "Not Reported" from filtered diagnoses
-final_diagnosis <- filtered_diagnosis[names(filtered_diagnosis) != "Not Reported"]
+# Remove "Not Reported"
+clinical_data_filtered <- clinical_data_filtered[
+  clinical_data_filtered$primary_diagnosis != "Not Reported", ]
 
-# View the final filtered data
-final_diagnosis
-
+table(clinical_data_filtered$primary_diagnosis)
 ```
 
 
@@ -389,19 +391,33 @@ colors <- c("#6A0572", "#9D0191", "#FF6464", "#FFAB73", "#FFC93C", "#F9F871")
 # Plot
 # Example of a pie chart
 pie(
-  final_diagnosis,
+  table(clinical_data_filtered$primary_diagnosis),
   main = "Primary Diagnosis",
   col = colors,
   border = "white"
 )
 
 ```
+  `adjj_pathologic_stage`: Represents the overall tumor stage (e.g., Stage I, II, III, IV) based on the AJCC (American Joint Committee on Cancer) system. This is a categorical clinical variable that reflects cancer progression and prognosis. It is highly relevant for survival analysis and differential expression studies, as advanced stages are typically associated with worse outcomes. Sub-stages denoted by letters such as A and B (e.g., IA vs IB) provide a finer classification within each stage, where A generally indicates a less advanced condition than B, often based on tumor size, lymph node involvement, or local invasion.
+  
+```{r}
+ggplot(clinical_data_filtered, aes(x = ajcc_pathologic_stage)) +
+  geom_bar(fill = "steelblue", color = "white") +
+  labs(
+    title = "Distribution of AJCC Pathologic Stages",
+    x = "AJCC Pathologic Stage",
+    y = "Count"
+  ) +
+  theme_minimal()
+```
+The bar plot shows the distribution of AJCC pathologic stages among patients in the dataset. The most common stages are Stage IA and Stage IB, which together represent the majority of cases. Higher stages such as Stage IIIA, IIIB, and IV are progressively less frequent, as expected in a cohort with a range of disease severities.
 
+A small number of patients are labeled as simply "Stage I" without further sub-classification (e.g., IA or IB), and a notable number of samples have missing values (NA). To ensure consistency and analytical accuracy, these samples will be excluded from subsequent analyses.
   
   `tissue_type`: Indicates the type of sample (Tumor, Normal --> Categorical Variable). Useful for distinguishing between diseased and control samples.
   
 ```{r}
-barplot(table(clinical_data_filtered@listData[["tissue_type"]]),
+barplot(table(clinical_data_filtered$tissue_type),
         main = "Distribution of Tissue Type",
         xlab = "Tissue Type",
         ylab = "Count",
@@ -412,7 +428,7 @@ barplot(table(clinical_data_filtered@listData[["tissue_type"]]),
 The response variable chosen is: `vital_status`. Indicates whether the patient is Alive or Dead at follow-up (Categorical Variable). It has a binary classification target. For us it will be useful for survival outcome prediction.
 
 ```{r}
-barplot(table(clinical_data_filtered@listData[["vital_status"]]),
+barplot(table(clinical_data_filtered$vital_status),
         main = "Distribution of Vital Status",
         xlab = "Vital Status",
         ylab = "Count",
@@ -431,28 +447,188 @@ filtered_data = expression_data[keep, ]
 
 ```
 
+### Testes de Hipóteses
 
-1  PARTE - CATARINA
+As part of the exploratory analysis, hypothesis testing was conducted to evaluate potential associations between key clinical variables and patient outcomes. These tests aim to identify statistically significant differences between groups, guiding further investigation in downstream analyses. In this study, we focused on the variables vital status, gender, race, age at diagnosis, primary diagnosis, and AJCC pathologic stage. These variables were selected due to their biological relevance and potential impact on lung adenocarcinoma progression and prognosis.
 
--LIMPAR DADOS
--FAZER MERGE
+**Note**: for all statistical tests performed below, a significance level of 0.05 was considered.
 
-2.1 PARTE - CATARINA   
--FAZER CONTEXTUALIZACAO
+```{r, echo=FALSE}
+# Convert to base R data frame
+clinical_df <- as.data.frame(clinical_data_filtered)
 
+clinical_df <- clinical_df %>%
+  filter(
+    !is.na(age_at_diagnosis),
+    !is.na(primary_diagnosis),
+    !is.na(race),
+    !is.na(gender),
+    !is.na(vital_status),
+    !is.na(ajcc_pathologic_stage),
+    ajcc_pathologic_stage != "Stage I"
+  )
 
+# Reverse the order of levels
+clinical_df$vital_status <- factor(clinical_df$vital_status, levels = c("Dead", "Alive"))
 
-2.2 PARTE - MARIA
--INTERPRETACAO DAS CENAS DA CATARINA (SUMMARIES)
--ESCOLHER AS 5 VARIAVEIS 
- -CONTEXTUALIZACAO DAS 5   (ESTATISTICAS DESCRITIVAS)
--APAGAR SAMPLES DE NAS
+# Calculate proportion of "Dead" per diagnosis
+dead_prop <- clinical_df %>%
+  group_by(primary_diagnosis) %>%
+  summarize(prop_dead = mean(vital_status == "Dead", na.rm = TRUE)) %>%
+  arrange(desc(prop_dead))
 
+# Reorder factor levels based on proportion
+clinical_df$primary_diagnosis <- factor(clinical_df$primary_diagnosis,
+                                        levels = dead_prop$primary_diagnosis)
+```
 
-3  PARTE - ARTUR
--CLUSTERING
+### Vital Status by Primary Diagnosis
 
-4 PARTE - CATARINA
--ANALISE DE EXPRESSAO DIFERENCIAL
+To explore potential differences in patient outcomes across histological subtypes of lung adenocarcinoma, we examined the distribution of vital status (Alive vs Dead) by primary diagnosis. The bar plot below displays the proportion of survival outcomes within each diagnosis group, highlighting subtype-specific survival patterns.
+
+```{r, echo=FALSE}
+# Plot
+ggplot(clinical_df, aes(x = primary_diagnosis, fill = vital_status)) +
+  geom_bar(position = "fill") +
+  geom_text(stat = "count", aes(label = after_stat(count)), 
+            position = position_fill(vjust = 0.5), size = 3) +
+  labs(title = "Vital Status by Primary Diagnosis", y = "Proportion") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+Among the subtypes, Adenocarcinoma (NOS) and Adenocarcinoma with mixed subtypes were the most represented. Notably, Adenocarcinoma, NOS showed a relatively higher proportion of deceased patients compared to some of the rarer subtypes, such as Acinar cell carcinoma and Mucinous adenocarcinoma, where survival rates appear higher.
+
+However, the smaller sample sizes in certain groups (e.g., Mucinous and Papillary adenocarcinoma) limit the strength of direct comparisons. This variation underscores the importance of histological subtype in patient prognosis and suggests possible biological differences between subtypes.
+
+A Chi-squared test was conducted to statistically evaluate the association between primary diagnosis and vital status. Although some subtypes show trends toward different outcomes, the test result (p = …) will help determine whether these observed differences are statistically significant.
+
+```{r}
+chisq.test(table(clinical_df$vital_status, clinical_df$primary_diagnosis))
+
+```
+
+The Chi-squared test is not reliable in this case, likely due to low expected counts in some cells. To address this limitation, we applied Fisher’s Exact Test with Monte Carlo simulation, which is more appropriate for contingency tables with small sample sizes or sparse data.
+ 
+```{r}
+fisher.test(table(clinical_df$vital_status, clinical_df$primary_diagnosis), simulate.p.value = TRUE)
+```
+
+Although there are visible differences in survival proportions across the primary diagnosis groups, the statistical tests did not find a significant association between vital status and primary diagnosis (p > 0.05 in both tests). This suggests that, within this dataset, histological subtype is not significantly associated with overall survival outcome — though sample size limitations, especially in rarer subtypes, may affect statistical power.
+
+### Vital Status by Gender
+
+To investigate potential sex-based differences in patient outcomes, we analyzed the distribution of vital status (Alive vs Dead) across gender. The bar plot below displays the proportion of survival outcomes within each gender group, allowing for visual comparison of mortality rates between males and females. Understanding gender-related survival patterns can provide insights into biological differences, healthcare access disparities, or treatment responses that may influence prognosis in lung adenocarcinoma.
+
+```{r}
+# Plot
+ggplot(clinical_df, aes(x = gender, fill = vital_status)) +
+geom_bar(position = "fill") +
+geom_text(stat = "count", aes(label = ..count..), position = position_fill(vjust = 0.5), size = 3) +
+labs(title = "Vital Status by Gender", y = "Proportion") +
+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+The plot illustrates the proportion of patients who are alive or deceased within each gender group. Among females, 142 are alive and 65 are deceased, while among males, 94 are alive and 59 are deceased. Although the absolute number of female patients is higher, the proportional survival appears similar between genders.
+
+No obvious survival advantage is visually evident for either gender in this sample. To determine whether these observed differences are statistically meaningful, a formal hypothesis test is required.
+
+```{r}
+chisq.test(table(clinical_df$vital_status, clinical_df$gender))
+
+```
+Since the p-value is greater than 0.05, we fail to reject the null hypothesis, indicating that there is no statistically significant association between gender and vital status in this dataset.
+
+This confirms the visual impression from the bar plot: although there are slight numerical differences, the proportions of alive and deceased patients are statistically similar between males and females.
+
+### Vital Status by Race
+
+To explore whether patient survival varies by racial background, we examined the distribution of vital status (Alive vs Dead) across different race categories. This allows for the identification of potential disparities in outcomes, which may reflect biological, environmental, or healthcare access differences.
+
+The bar plot (not shown here) displays the proportion of survival outcomes within each racial group. While the proportions may vary slightly between groups, visual inspection alone is insufficient to confirm any meaningful pattern.
+
+```{r}
+# Plot
+ggplot(clinical_df, aes(x = race, fill = vital_status)) +
+geom_bar(position = "fill") +
+geom_text(stat = "count", aes(label = ..count..), position = position_fill(vjust = 0.5), size = 3) +
+labs(title = "Vital Status by Race", y = "Proportion") +
+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+The bar plot displays the distribution of vital status (Alive vs Dead) across two racial groups: Black or African American and White. Among Black or African American patients, 33 were alive and 9 were deceased. In contrast, among White patients, 203 were alive and 115 were deceased.
+
+Although the raw numbers differ due to sample size imbalance, the proportions of survival outcomes appear somewhat different between the groups when examined visually.
+
+To formally assess whether these differences are statistically significant, a Chi-squared test should be applied. If the resulting p-value is greater than 0.05, we would conclude that there is no significant association between race and vital status in this dataset.
+
+```{r}
+chisq.test(table(clinical_df$vital_status, clinical_df$race))
+```
+Since the p-value is greater than 0.05, we fail to reject the null hypothesis, indicating that there is no statistically significant association between race and vital status in this dataset. However, the p-value is close to the significance threshold, suggesting a possible trend that may warrant further investigation in larger or more balanced samples.
+
+### Vital Status by AJCC Pathologic Stage
+
+To investigate the relationship between cancer severity and patient outcomes, we analyzed the distribution of vital status (Alive vs Dead) across different AJCC pathologic stages. As cancer stage is a key prognostic indicator, we expect higher stages to be associated with poorer survival.
+
+```{r}
+# Plot
+ggplot(clinical_df, aes(x = ajcc_pathologic_stage, fill = vital_status)) +
+geom_bar(position = "fill") +
+geom_text(stat = "count", aes(label = ..count..), position = position_fill(vjust = 0.5), size = 3) +
+labs(title = "Vital Status by AJCC Pathologic Stage", y = "Proportion") +
+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+A clear trend emerges: earlier stages, such as Stage IA, show a higher proportion of patients alive (94 Alive vs 12 Dead), whereas advanced stages like Stage IIIB and Stage IV show a much higher proportion of deceased patients. For example, in Stage IIIB, only 6 patients are alive compared to 11 deceased — illustrating the sharp decline in survival as stage increases.
+
+To statistically assess this relationship, both a Chi-squared test and Fisher’s Exact Test were applied:
+
+```{r}
+chisq.test(table(clinical_df$vital_status, clinical_df$ajcc_pathologic_stage))
+```
+```{r}
+fisher.test(table(clinical_df$vital_status, clinical_df$ajcc_pathologic_stage), simulate.p.value = TRUE)
+```
+Both tests strongly reject the null hypothesis of independence (p < 0.001), confirming a significant association between AJCC pathologic stage and survival outcome. These results are consistent with clinical expectations: more advanced tumor stages are associated with significantly worse prognosis in lung adenocarcinoma.
+
+### Vital Status by Age at Diagnosis
+
+To explore whether age at diagnosis influences patient survival, we compared the age distributions between patients who were alive and those who were deceased at the time of data collection. A boxplot was used to visualize potential differences in age between the two vital status groups.
+
+```{r}
+ggplot(clinical_df, aes(x = vital_status, y = age_at_diagnosis , fill = vital_status)) +
+  geom_boxplot(outlier.shape = 21, outlier.fill = "white") +
+  labs(
+    title = "Age at Diagnosis by Vital Status",
+    x = "Vital Status",
+    y = "Age at Diagnosis (years)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")  # optional: remove redundant legend
+
+```
+This visual trend suggests a possible relationship between age and survival, where older age at diagnosis may be linked to worse outcomes. However, the overlapping interquartile ranges also indicate that the difference may not be substantial.
+
+```{r}
+# Shapiro-Wilk test for normality in each group
+shapiro.test(clinical_df$age_at_diagnosis[clinical_df$vital_status == "Alive"])
+shapiro.test(clinical_df$age_at_diagnosis[clinical_df$vital_status == "Dead"])
+```
+The Shapiro-Wilk test indicated that the age distributions for both the alive and deceased groups significantly deviate from a normal distribution (p < 0.05). To visually confirm this outcome, we generated Q-Q plots for each group, which further supported the presence of deviations from normality.
+
+```{r}
+qqnorm(clinical_df$age_at_diagnosis[clinical_df$vital_status == "Alive"])
+qqline(clinical_df$age_at_diagnosis[clinical_df$vital_status == "Alive"])
+```
+```{r}
+qqnorm(clinical_df$age_at_diagnosis[clinical_df$vital_status == "Dead"])
+qqline(clinical_df$age_at_diagnosis[clinical_df$vital_status == "Dead"])
+```
+The plots show noticeable deviations from the diagonal line, particularly in the tails, further supporting the conclusion that the data are not normally distributed. Given the violation of normality assumptions, we proceeded with a non-parametric Wilcoxon rank-sum test to compare the age distributions between groups.
+
+```{r}
+wilcox.test(age_at_diagnosis ~ vital_status, data = clinical_df)
+```
+Since the p-value is much greater than 0.05, we fail to reject the null hypothesis, indicating that there is no statistically significant difference in age at diagnosis between patients who are alive and those who are deceased in this cohort.
+
 
 
