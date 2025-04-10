@@ -8,19 +8,26 @@ We are using the **Lung Adenocarcinoma (TCGA, GDC)** dataset, available at [cBio
 
 ## Project Structure   
 ```
-├── relatorio_grupo1.rmd # R and Rmd script for analysis
-├── README.md            # Project documentation
+├── html/                # HTML outputs
+│   └── [relatorio_grupo1_fase1]
+│
+├── scripts/             # R and Rmd scripts
+│   └── [relatorio_grupo1_fase1]
+│
+├── relatorio_grupo1_fase1_files/            
+└── README.md            # Project documentation
+
 ```
 
 ## Objectives
 The project is divided into two phases:
-### **Phase 1 (Due: April 3, 2024)**
+### **Phase 1**
 - Data acquisition and preprocessing
 - Data summary (descriptive statistics and visualizations)
 - Univariate statistical analysis
 - Differential expression and enrichment analysis
 
-### **Phase 2 (Due: May 8, 2024)**
+### **Phase 2**
 - Clustering (genes/samples), dimensionality reduction, and MDS
 - Predictive analysis (classification/regression with at least two models)
 - Gene selection and importance evaluation
