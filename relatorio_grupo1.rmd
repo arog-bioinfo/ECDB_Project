@@ -982,13 +982,13 @@ plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000145692.15"), intgroup
 
 ```
 
-1. Gene **ENSG00000122711.9** is significantly downregulated in patients who are in the "Dead# group compared to those who are on the "Alive" group, based on normalized counts. This difference is visible in the plot and statistically confirmed by DESeq2.
+1. Gene **ENSG00000122711.9** is significantly downregulated in patients in the "Dead" group compared to those who are on the "Alive" group, based on normalized counts. This difference is visible in the plot and statistically confirmed by DESeq2.
 
 2. Gene **ENSG00000130055.14** is more highly expressed in the "Dead" group compared to the "Alive" group, suggesting its expression is associated with vital status. Statistical tests were done to confirm this.
 
-3. 
+3. Gene **ENSG00000185269.12** is significantly downregulated in the "Dead" group, suggesting it may be associated with a protective or survival-related function.
 
-4.
+4. Gene **ENSG00000145692.15** is also significantly downregulated in the ‘Dead’ group, with slightly more modest fold change, but still statistically meaningful.
 
 
 ```{r}
