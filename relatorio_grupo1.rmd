@@ -125,7 +125,7 @@ The **`GDCdownload()`** function is then used to download the data according to 
 # Define the base directory
 
 # base_dir <- "/Users/mariacarvalho/Desktop/Mestrado/2º\ semestre/Extração"  # Change this to your desired path
- base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
+#base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
 # base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"
 
 
@@ -214,10 +214,6 @@ expression_data <- as.data.frame(assay(rna_seq_LUAD))
 # Extract clinical metadata
 clinical_data <- colData(rna_seq_LUAD)
 
-# Check the first few rows of each dataset
-head(expression_data)[,1:5]  
-head(clinical_data)
-
 ```
 
 ###Initial Data Exploration
@@ -301,6 +297,9 @@ columns_with_no_na <- names(clinical_data_filtered)[colSums(is.na(clinical_data_
 
 columns_with_no_na
 ```
+
+## Univariate Statistical Analysis
+
 After filtering the variables, we selected the following as our feature variables:
   `gender` : Biological sex of the patient (Male or Female --> Categorical Variable). Can influence disease prevalence and progression.
   
