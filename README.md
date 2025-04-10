@@ -8,14 +8,18 @@ We are using the **Lung Adenocarcinoma (TCGA, GDC)** dataset, available at [cBio
 
 ## Project Structure   
 ```
-├── htmls/                # HTML outputs
+├── htmls/                         # HTML outputs
 │   └── relatorio_grupo1_fase1.html
 │
-├── scripts_R/             # R and Rmd scripts
+├── scripts_R/                    # R and Rmd scripts
 │   └── relatorio_grupo1_fase1.rmd
 │
-├── relatorio_grupo1_fase1_files/            
-└── README.md            # Project documentation
+├── relatorio_grupo1_fase1_files/
+│
+├── data_csv/                     # CSV data files
+│
+└── README.md                     # Project documentation
+
 
 ```
 
