@@ -642,8 +642,7 @@ In order to analyze the genes that are differentially expressed in the tumor typ
 
 
 ```{r}
-final_diagnosis
-
+clinical_df
 ```
 
 Initially, samples with the primary diagnosis **“Adenocarcinoma, NOS”** were filtered, as only these samples are relevant to our study due to the higher incidence of this cancer subtype. 
@@ -652,7 +651,7 @@ Initially, samples with the primary diagnosis **“Adenocarcinoma, NOS”** were
 ```{r}
 diagnosis_table
 
-filtered_diagnosis = filtered_diagnosis[final_diagnosis == "Adenocarcinoma, NOS"]
+filtered_diagnosis = clinical_df[clinical_df == "Adenocarcinoma, NOS"]
 data_ADC = expression_data[,rownames((filtered_diagnosis))]
 dim(data_ADC)
 ```
@@ -767,6 +766,7 @@ mutant_genes = c("ENSG00000171862.11", "ENSG00000121879.6", "ENSG00000145675.15"
                   "ENSG00000141510.18", "ENSG00000066468.23", "ENSG00000150347.16")
 
 n_gene_edgeR=c()
+
 for (gene in mutant_genes){
   n_gene_edgeR=c(n_gene_edgeR, which(rownames(filtered_results)==gene))
 }
