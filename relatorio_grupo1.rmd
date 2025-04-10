@@ -125,7 +125,7 @@ The **`GDCdownload()`** function is then used to download the data according to 
 # Define the base directory
 
 # base_dir <- "/Users/mariacarvalho/Desktop/Mestrado/2º\ semestre/Extração"  # Change this to your desired path
-# base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
+ base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
 # base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"
 
 
@@ -202,7 +202,7 @@ The richness and scale of this dataset make it an invaluable resource for:
 The comprehensive nature of the TCGA-LUAD dataset supports efforts in understanding the molecular mechanisms driving lung adenocarcinoma and developing personalized therapeutic strategies. By integrating clinical variables with genomic data, this resource enables a multidimensional approach to investigating one of the most common and lethal cancer subtypes.
 
 
-## Data Pre Processing
+## Data Pre-Processing
 
 In this stage, we preprocess the dataset to ensure its quality for differential expression and enrichment analysis. First, we separate the gene expression data from the metadata, structuring the dataset for efficient analysis. Then, we apply filtering techniques to remove noise, retaining only biologically relevant information that will enhance the accuracy of downstream analyses.
 
@@ -489,7 +489,7 @@ clinical_df$primary_diagnosis <- factor(clinical_df$primary_diagnosis,
                                         levels = dead_prop$primary_diagnosis)
 ```
 
-### Vital Status by Primary Diagnosis
+#### Vital Status by Primary Diagnosis
 
 To explore potential differences in patient outcomes across histological subtypes of lung adenocarcinoma, we examined the distribution of vital status (Alive vs Dead) by primary diagnosis. The bar plot below displays the proportion of survival outcomes within each diagnosis group, highlighting subtype-specific survival patterns.
 
@@ -522,7 +522,7 @@ fisher.test(table(clinical_df$vital_status, clinical_df$primary_diagnosis), simu
 
 Although there are visible differences in survival proportions across the primary diagnosis groups, the statistical tests did not find a significant association between vital status and primary diagnosis (p > 0.05 in both tests). This suggests that, within this dataset, histological subtype is not significantly associated with overall survival outcome — though sample size limitations, especially in rarer subtypes, may affect statistical power.
 
-### Vital Status by Gender
+#### Vital Status by Gender
 
 To investigate potential sex-based differences in patient outcomes, we analyzed the distribution of vital status (Alive vs Dead) across gender. The bar plot below displays the proportion of survival outcomes within each gender group, allowing for visual comparison of mortality rates between males and females. Understanding gender-related survival patterns can provide insights into biological differences, healthcare access disparities, or treatment responses that may influence prognosis in lung adenocarcinoma.
 
@@ -546,7 +546,7 @@ Since the p-value is greater than 0.05, we fail to reject the null hypothesis, i
 
 This confirms the visual impression from the bar plot: although there are slight numerical differences, the proportions of alive and deceased patients are statistically similar between males and females.
 
-### Vital Status by Race
+#### Vital Status by Race
 
 To explore whether patient survival varies by racial background, we examined the distribution of vital status (Alive vs Dead) across different race categories. This allows for the identification of potential disparities in outcomes, which may reflect biological, environmental, or healthcare access differences.
 
@@ -572,7 +572,7 @@ chisq.test(table(clinical_df$vital_status, clinical_df$race))
 ```
 Since the p-value is greater than 0.05, we fail to reject the null hypothesis, indicating that there is no statistically significant association between race and vital status in this dataset. However, the p-value is close to the significance threshold, suggesting a possible trend that may warrant further investigation in larger or more balanced samples.
 
-### Vital Status by AJCC Pathologic Stage
+#### Vital Status by AJCC Pathologic Stage
 
 To investigate the relationship between cancer severity and patient outcomes, we analyzed the distribution of vital status (Alive vs Dead) across different AJCC pathologic stages. As cancer stage is a key prognostic indicator, we expect higher stages to be associated with poorer survival.
 
@@ -598,7 +598,7 @@ fisher.test(table(clinical_df$vital_status, clinical_df$ajcc_pathologic_stage), 
 ```
 Both tests strongly reject the null hypothesis of independence (p < 0.001), confirming a significant association between AJCC pathologic stage and survival outcome. These results are consistent with clinical expectations: more advanced tumor stages are associated with significantly worse prognosis in lung adenocarcinoma.
 
-### Vital Status by Age at Diagnosis
+#### Vital Status by Age at Diagnosis
 
 To explore whether age at diagnosis influences patient survival, we compared the age distributions between patients who were alive and those who were deceased at the time of data collection. A boxplot was used to visualize potential differences in age between the two vital status groups.
 
@@ -1014,12 +1014,14 @@ write.csv(res, file = "dge_deseq2.csv", row.names = T)
 
 ```{r}
 # Loading the group of genes for enrichment analysis
-path = gmtPathways("/Users/mariacarvalho/c6.all.v2023.2.Hs.symbols.gmt")
+c6_dir <- file.path(base_dir, "c6.all.v2023.2.Hs.symbols.gmt")
+path = gmtPathways(c6_dir)
 
+# Sort the results by expression change in descending order
+results_ord = res[order(-res[,"log2FoldChange"]), ]
 
-# Prepara os rankings para a FGSEA
+# Prepares the rankings for FGSEA
 ranks = results_ord$log2FoldChange
-
 
 # Associates the name of the gene to the lines
 names(ranks) = results_ord$gene_name
