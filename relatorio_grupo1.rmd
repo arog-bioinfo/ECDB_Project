@@ -974,7 +974,7 @@ All 4 genes show statistically significant differential expression (padj < 0.01)
 
 
 ```{r}
-# analise dos genes do estudo sinalizados como diferencialmente expressos
+# Analysis of the study genes signaled as differentially expressed
 
 plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000122711.9"), intgroup="vital_status", pch = 19)
 plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000130055.14"), intgroup="vital_status", pch = 19)
@@ -1004,7 +1004,7 @@ for (gene in rownames(res)) {
 
 ```{r}
 # Adding the name of each gene to the dataframe of the differential expression results
-res["gene_name"] =gene_name
+res["gene_name"] = gene_name
 ```
 
 ```{r}
@@ -1013,14 +1013,21 @@ write.csv(res, file = "dge_deseq2.csv", row.names = T)
 ```
 
 ```{r}
-# carregamento do grupo de genes para a análise de enriquecimento
-path = gmtPathways("h.all.v2023.2.Hs.symbols.gmt") --> ALTERAR
-# Ordena os resultados pela alteração na expressão em ordem decrescente
-results_ord = res[order(-res[,"log2FoldChange"]), ]
+# Loading the group of genes for enrichment analysis
+path = gmtPathways("/Users/mariacarvalho/c6.all.v2023.2.Hs.symbols.gmt")
+
+
 # Prepara os rankings para a FGSEA
 ranks = results_ord$log2FoldChange
-# associa às linhas o nome do gene
+
+
+# Associates the name of the gene to the lines
 names(ranks) = results_ord$gene_name
+
+# Sorts the results by the change in expression in descending order
+results_ord = res[order(-res[,"log2FoldChange"]), ]
+
+
 # Identificar genes duplicados
 duplicated_genes = names(ranks)[duplicated(names(ranks))]
 # Remover genes duplicados
