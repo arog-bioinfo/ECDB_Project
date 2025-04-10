@@ -33,14 +33,37 @@ The project is divided into two phases:
 - Gene selection and importance evaluation
 
 ## Methodology
-The following tools and techniques will be used:
-- **Data Processing**: R, Bioconductor, tidyverse
-- **Visualization**: ggplot2, heatmaps, PCA plots
-- **Statistical Analysis**: DESeq2, edgeR, limma, genefilter
-- **Enrichment Analysis**: fgsea, org.Hs.eg.db, AnnotationDbi
-- **Machine Learning**: caret, rpart, rsample
-- **Dimensionality Reduction**: Rtsne, factoextra
-- **Clustering**: pheatmap, gplots
+
+The following tools and techniques were used throughout the analysis, organized by their role in the workflow:
+
+- **Data Acquisition & Processing**  
+  Packages: `TCGAbiolinks`, `SummarizedExperiment`, `Biobase`, `tidyverse`  
+  Used for downloading, filtering, and organizing genomic datasets, particularly from TCGA.
+
+- **Visualization**  
+  Packages: `ggplot2`, `ggbeeswarm`, `pheatmap`, `gplots`, `RColorBrewer`, `factoextra`  
+  Applied to generate scatter plots, beeswarm plots, heatmaps, and enhanced visual summaries of clustering and dimensionality reduction.
+
+- **Statistical Analysis**  
+  Packages: `DESeq2`, `edgeR`, `genefilter`, `AnnotationDbi`, `org.Hs.eg.db`  
+  Utilized for differential gene expression analysis, statistical filtering, and annotation mapping.
+
+- **Enrichment Analysis**  
+  Packages: `fgsea`, `org.Hs.eg.db`, `AnnotationDbi`  
+  Conducted gene set enrichment analysis and mapped gene identifiers to biological pathways and functions.
+
+- **Dimensionality Reduction**  
+  Packages: `Rtsne`, `factoextra`  
+  Used for reducing data dimensionality and visualizing sample separation.
+
+- **Clustering**  
+  Packages: `pheatmap`, `gplots`  
+  Implemented hierarchical clustering and heatmap visualizations to group similar samples or genes.
+
+- **Machine Learning & Predictive Modeling**  
+  Packages: `caret`, `rpart`, `rsample`  
+  Employed for model training, validation, and evaluation, especially in classifying sample groups or predicting outcomes.
+
 
 ## Reproducibility
 - All analyses will be performed in R Markdown and exported as HTML reports.
