@@ -231,6 +231,13 @@ Based on the exploration of the dataset, we can confirm that it is a SummarizedE
 In contrast, the columns represent 600 biological samples, each described by 93 metadata variables. These metadata fields contain rich information about the samples — such as clinical, demographic, or experimental attributes — which are essential for investigating how various sample characteristics influence gene expression.
 It’s also worth noting that the structure of the metadata changes when accessed directly: in the gene metadata (rowData), rows are indexed by gene identifiers; whereas in the sample metadata (colData), rows are indexed by sample IDs. This format makes it easier to analyze and query gene- or sample-specific information independently.
 
+```{r}
+# Filter genes with low expression
+keep_genes <- rowSums(expression_data > 1) > ncol(expression_data) * 0.5
+expression_filtered <- expression_data[keep_genes, ]
+
+cat("Dimensions:", dim(rna_seq_LUAD)[1], "genes x", dim(rna_seq_LUAD)[2], "samples\n")
+```
 
 ```{r}
 # Summaries
@@ -440,13 +447,12 @@ barplot(table(clinical_data_filtered@listData[["vital_status"]]),
 
 To ensure the reliability of downstream analyses, genes with low expression across the majority of samples were filtered out. Specifically, only genes with counts greater than 1 in more than 50% of the samples were retained. This step helps reduce noise from lowly expressed or non-informative genes.
 
-```{r}
-# Keep only genes where at least 50% of samples have counts >1
-keep = rowSums(expression_data > 1) > (0.5 * ncol(expression_data))
-filtered_data = expression_data[keep, ]
 
-```
 
+
+### Enrichment Analysis
+
+After performing differential gene expression analysis, enrichment analysis was conducted to identify biological pathways significantly associated with the differentially expressed genes. The gene names were standardized to match those in the `.gmt` file, and the data were saved in a CSV format for ease of use. The "Hallmark" gene set was chosen as the background due to its representation of well-defined biological processes. Genes were sorted by decreasing log2 fold change, and duplicates were removed to ensure accurate results. The enrichment outcomes, ranked by adjusted p-value, were also saved to a CSV file.
 
 
 
@@ -456,6 +462,7 @@ filtered_data = expression_data[keep, ]
 2. Cancer Treatment Centers of America. (n.d.). Adenocarcinoma of the lung. Cancer Treatment Centers of America. https://www.cancercenter.com/cancer-types/lung-cancer/types/adenocarcinoma-of-the-lung
 3. American Cancer Society. (n.d.). What is lung cancer? American Cancer Society. https://www.cancer.org/cancer/types/lung-cancer/about/what-is.html
 4. Lung Cancer Foundation of America. (n.d.). Adenocarcinoma of the lung: An introduction. Lung Cancer Foundation of America. https://lcfamerica.org/about-lung-cancer/diagnosis/types/adenocarcinoma/
+
 
 
 
