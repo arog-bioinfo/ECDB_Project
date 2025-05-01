@@ -13,7 +13,7 @@ output:
 ---
 <img src="EEUMLOGO.png" alt="Logo da Empresa" style="float:right; margin: 10px 10px 0 0; width: 110px; height: auto;" />
 
-# {.tabset} 
+# Phase 1 {.tabset} 
 
 
 ## Dataset Download and Import
@@ -67,7 +67,8 @@ cran_packages <- c(
   "tidyverse",
   "rpart",
   "rsample",
-  "caret"
+  "caret",
+  "uwot"
 )
 
 # Install missing CRAN packages
@@ -126,7 +127,7 @@ The **`GDCdownload()`** function is then used to download the data according to 
 
 # base_dir <- "/Users/mariacarvalho/Desktop/Mestrado/2º\ semestre/Extração"  # Change this to your desired path
 # base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
-# base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"
+base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"
 
 
 # Create directory if it doesn't exist
@@ -1062,6 +1063,253 @@ sum(enrichment$padj<0.01)
 
 head(enrichment)
 ```
+
+
+# Phase 2 - Unsupervised Analysis
+
+## 1. Dimensionality Reduction {.tabset}
+
+High-dimensional biological datasets, such as transcriptomic profiles, often contain thousands of variables per sample. This complexity can obscure meaningful biological patterns or relationships between samples.  
+To address this, we applied **dimensionality reduction techniques** that project high-dimensional data into a lower-dimensional space while preserving important global or local structures.
+
+In this analysis, we used a combination of:
+- **Principal Component Analysis (PCA)**, to identify the main axes of variation and reduce noise in the data,
+- **t-Distributed Stochastic Neighbor Embedding (t-SNE)**, which emphasizes local relationships and can reveal subtle clusters or subgroups,
+- and **Uniform Manifold Approximation and Projection (UMAP)**, a recent method that balances the preservation of both global and local data structure and is computationally more efficient than t-SNE.
+
+These methods complement each other: PCA provides a general overview of variance across the dataset, while t-SNE and UMAP allow for more refined visualization of local similarities and potential sample groupings. Together, they offer a robust approach to exploring underlying structures that may reflect biological or clinical relevance.
+
+## PCA (Principal Component Analysis)
+
+```{r}
+pca_data = t(ADC_data_CPM)  # transpose: samples in columns, genes in rows
+
+pcares1 <- prcomp(pca_data, scale = FALSE)  # data already normalized
+
+summary(pcares1)$importance[3, ]
+
+min(which(summary(pcares1)$importance[3,] > 0.95))
+```
+
+In this dataset, consisting of **60,660 genes** and **600 samples**, it was determined that **44 principal components** are required to explain **at least 95% of the data variability**.  
+The variance plot shows that the **first two principal components** capture a considerable portion of the variance, though not dominant, which justifies their use for an initial visualization of the data structure.
+
+
+```{r}
+head(pcares1$rotation[, 1:44])
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
+plot(pcares1)
+biplot(pcares1)
+```
+However, the biplot of the first two components shows a scattered distribution of the samples with no clear clusters. Additionally, the high density of labels makes visual interpretation difficult, indicating that while this graphical representation is informative, it is not sufficient by itself to distinguish group patterns.
+
+
+## PCA by Clinical Variables {.tabset}
+
+To better investigate the potential biological or clinical groupings within the data, the PCA results were visualized with samples colored by key clinical features. These visualizations help assess whether specific sample groupings, observed in lower-dimensional space, correlate with clinical variables such as **vital status**, **primary diagnosis**, **gender**, **race**, **AJCC stage**, or **age at diagnosis**.
+
+Although PCA is an unsupervised method and does not explicitly use class labels during its computation, overlaps or separations between sample groups in PCA plots may reveal biologically meaningful trends.
+
+### By Primary Diagnosis and Vital Status
+
+```{r, echo=FALSE, warning=FALSE}
+pca_df <- as.data.frame(pcares1$x)
+pca_df$sample_id <- rownames(pca_df)
+clinical_df$sample_id <- rownames(clinical_df)
+pca_df_merged <- merge(pca_df, clinical_df, by = "sample_id")
+
+ggplot(pca_df_merged, aes(x = PC1, y = PC2, color = primary_diagnosis, shape = vital_status)) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  labs(title = "PCA: Primary Diagnosis & Vital Status", x = "PC1", y = "PC2") +
+  theme_minimal()
+```
+
+### By Gender and Vital Status
+
+```{r, echo=FALSE}
+ggplot(pca_df_merged, aes(x = PC1, y = PC2, color = gender, shape = vital_status)) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  labs(title = "PCA: Gender & Vital Status", x = "PC1", y = "PC2") +
+  theme_minimal()
+```
+
+### By Race and Vital Status
+
+```{r, echo=FALSE}
+ggplot(pca_df_merged, aes(x = PC1, y = PC2, color = race, shape = vital_status)) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  labs(title = "PCA: Race & Vital Status", x = "PC1", y = "PC2") +
+  theme_minimal()
+```
+
+### By AJCC Pathologic Stage and Vital Status
+
+```{r, echo=FALSE}
+ggplot(pca_df_merged, aes(x = PC1, y = PC2, color = ajcc_pathologic_stage, shape = vital_status)) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  labs(title = "PCA: AJCC Stage & Vital Status", x = "PC1", y = "PC2") +
+  theme_minimal()
+```
+
+### By Age at Diagnosis and Vital Status
+
+```{r, echo=FALSE}
+ggplot(pca_df_merged, aes(x = PC1, y = PC2, color = age_at_diagnosis, shape = vital_status)) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  scale_color_gradient(low = "blue", high = "red") +
+  labs(title = "PCA: Age at Diagnosis & Vital Status", x = "PC1", y = "PC2", color = "Age") +
+  theme_minimal()
+```
+
+**Initial Observations from PCA Plots**
+
+1. **No clear visual clusters**:  
+   The distribution of data points in the PC1 vs. PC2 plane does not show distinct separations between groups (e.g., Alive vs. Dead, Male vs. Female). This suggests that the **first two principal components do not effectively capture the clinical differences among groups**.
+
+2. **Partial grouping by variables such as AJCC stage and age**:  
+   - The *AJCC Stage* plot shows some variation in point positions across stages, but without clear separation.  
+   - The color gradient in the *Age at Diagnosis* plot indicates a continuous variable distribution, as expected, but it does not appear to strongly correlate with the principal components.
+
+3. **Highly imbalanced categories in Primary Diagnosis and Race**:  
+   - The *Primary Diagnosis* category is dominated by “Adenocarcinoma, NOS,” which may reduce the variability available for interpretation.  
+   - Only two race categories are represented, which can limit the generalizability of the analysis and introduce bias.
+
+Perfeito! Aqui está uma transição suave do PCA para a análise com t-SNE e UMAP, escrita em inglês técnico apropriado para seu relatório:
+
+
+**Limitations of PCA and Motivation for Non-linear Methods**
+
+Although PCA provides a valuable overview of the variance structure in high-dimensional data, it is fundamentally a linear technique. The first two principal components, while accounting for a significant portion of the variance, **failed to separate samples based on clinical variables such as vital status, gender, race, or AJCC stage**. This suggests that the patterns distinguishing these subgroups may not be captured by linear projections alone.
+
+To address this, we employed **non-linear dimensionality reduction techniques**—specifically:
+
+- **t-Distributed Stochastic Neighbor Embedding (t-SNE)**, which focuses on preserving local similarities and is effective in revealing subtle clustering structures, and  
+- **Uniform Manifold Approximation and Projection (UMAP)**, which balances local and global structure preservation and is generally more scalable and interpretable.
+
+These techniques can uncover latent relationships in complex transcriptomic data that may be **non-linear in nature**, thereby offering improved visualization of potential biological or clinical groupings.
+
+
+## t-SNE (t-Distributed Stochastic Neighbor Embedding)
+
+t-SNE is a non-linear dimensionality reduction technique that maps high-dimensional data to a low-dimensional space by preserving the probability distribution of pairwise similarities. It is particularly well-suited to reveal **local clusters** or subgroup patterns that PCA might miss due to its linear nature.
+
+Before running t-SNE, we removed duplicate entries and used the PCA-reduced data as input, a common practice to reduce noise and improve computational efficiency.
+
+```{r, message=FALSE, warning=FALSE}
+# Remove duplicated rows (required by t-SNE)
+rownames(pca_data)
+dados_CPM_nd <- pca_data[!duplicated(pca_data),]
+dim(dados_CPM_nd)
+rownames(dados_CPM_nd) <- rownames(pca_data)[!duplicated(pca_data)]
+
+
+# Run t-SNE
+library(Rtsne)
+set.seed(42)
+res_tsne <- Rtsne(dados_CPM_nd, dims = 2, perplexity = 30, verbose = TRUE)
+
+# Store t-SNE coordinates
+tsne_df <- as.data.frame(res_tsne$Y)
+colnames(tsne_df) <- c("tSNE1", "tSNE2")
+rownames(tsne_df) <- rownames(dados_CPM_nd)
+
+clinical_df_filtered <- clinical_df[rownames(tsne_df), ]
+tsne_df_final <- cbind(tsne_df, clinical_df_filtered)
+
+```
+
+Now, we visualize the t-SNE embeddings colored by clinical and demographic attributes:
+
+```{r, message=FALSE, warning=FALSE}
+library(ggplot2)
+
+# t-SNE by Vital Status and Gender
+ggplot(tsne_df_final, aes(x = tSNE1, y = tSNE2, color = gender, shape = vital_status)) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(title = "t-SNE: Gender & Vital Status")
+
+# t-SNE by Primary Diagnosis and Vital Status
+ggplot(tsne_df_final, aes(x = tSNE1, y = tSNE2, color = primary_diagnosis, shape = vital_status)) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(title = "t-SNE: Primary Diagnosis & Vital Status")
+
+# t-SNE by AJCC Stage and Vital Status
+ggplot(tsne_df_final, aes(x = tSNE1, y = tSNE2, color = ajcc_pathologic_stage, shape = vital_status)) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(title = "t-SNE: AJCC Stage & Vital Status")
+
+# t-SNE by Race and Vital Status
+ggplot(tsne_df_final, aes(x = tSNE1, y = tSNE2, color = race, shape = vital_status)) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(title = "t-SNE: Race & Vital Status")
+
+# t-SNE by Age and Vital Status
+ggplot(tsne_df_final, aes(x = tSNE1, y = tSNE2, color = age_at_diagnosis, shape = vital_status)) +
+  geom_point(size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "t-SNE: Age & Vital Status")
+```
+
+
+
+## UMAP (Uniform Manifold Approximation and Projection)
+
+UMAP is another powerful non-linear method that builds on manifold learning and topological data analysis. Compared to t-SNE, UMAP generally offers **better global structure retention** and can be tuned to emphasize either local or global features.
+
+We applied UMAP using the same PCA-reduced input to maintain consistency and avoid redundancy in high-dimensional noise.
+
+```{r, message=FALSE, warning=FALSE}
+library(umap)
+
+# Run UMAP
+umap_res <- umap(dados_CPM_nd)
+umap_df <- as.data.frame(umap_res$layout)
+colnames(umap_df) <- c("UMAP1", "UMAP2")
+clinical_df_filtered <- clinical_df[rownames(umap_df), ]  
+umap_df <- cbind(umap_df, clinical_df_filtered)
+```
+
+And we visualize the UMAP projection:
+
+```{r, message=FALSE, warning=FALSE}
+# UMAP by Vital Status and Gender
+ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = gender, shape = vital_status)) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(title = "UMAP: Gender & Vital Status")
+
+# UMAP by AJCC Stage and Vital Status
+ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = ajcc_pathologic_stage, shape = vital_status)) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(title = "UMAP: AJCC Stage & Vital Status")
+
+# UMAP by Race and Vital Status
+ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = race, shape = vital_status)) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(title = "UMAP: Race & Vital Status")
+
+# UMAP by Age and Vital Status
+ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = age_at_diagnosis, shape = vital_status)) +
+  geom_point(size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "UMAP: Age & Vital Status")
+```
+
+
+
+
+
 
 
 ### Bibliography
