@@ -1358,6 +1358,342 @@ This indicates that while UMAP captures meaningful relationships in the data, **
 
 UMAP projections revealed more defined structures compared to PCA and t-SNE, with denser local groupings and clearer spatial organization. However, these structures did not correspond to the available clinical features, reinforcing the likelihood that **other, unmeasured biological factors** underlie the observed transcriptomic variation.
 
+### Clustering
+
+Clustering is a type of unsupervised machine learning that finds hidden patterns in data by grouping similar items together. It uses distance or similarity measurements to form groups (clusters) so that items in the same group are as similar as possible, and items in different groups are as different as possible.
+In this analysis, we used two main clustering methods:
+**1. Hierarchical Clustering**: builds a tree-like diagram (dendrogram) by repeatedly joining the closest items or groups without needing to set the number of clusters in advance.
+**2. K-means Clustering**: splits the data into a fixed number (K) of groups by minimizing the distances between items and the center (centroid) of their group.
+
+Before clustering, we converted the normalized gene expression data into a matrix format. Since the clustering methods need numerical matrices, this step ensures that the data can be processed. For sample-based analysis, we also transposed the matrix so that samples are in the rows and genes are in the columns.
+
+```{r}
+# Normalize RNA-seq data using DESeq
+ddsSE_normalized <- DESeq(ddsSE)
+rna_expression_matrix <- as.matrix(assay(ddsSE_normalized))
+rna_expression_transposed <- t(rna_expression_matrix)
+```
+## 1. Hierarchical Clustering
+
+Hierarchical clustering follows a bottom-up approach. It starts with each item as its own cluster and then gradually combines the closest clusters until all items are in a single group.
+We use **Euclidean distance** to measure how similar two profiles are. This is a standard way of measuring straight-line distance between points in multi-dimensional space.
+
+
+```{r}
+# Perform statistical test on each gene
+ttest_results_genes <- rowttests(t(rna_expression_matrix))
+gene_pvalue_ranking <- order(ttest_results_genes$p.value)
+
+# Select top 30 genes with lowest p-values
+top_gene_indices <- gene_pvalue_ranking[1:30]
+ranked_gene_matrix <- rna_expression_matrix[top_gene_indices,]
+
+# Calculate Euclidean distance
+euclidean_dist_genes <- dist(ranked_gene_matrix)
+
+```
+
+# Gene Clustering
+
+We selected the top **30** most differentially expressed genes by choosing those with the smallest p-values from a statistical test.
+We calculated the Euclidean distance between the expression profiles of these genes across all samples.
+We used three different methods to build the dendrograms:
+    Single linkage: joins clusters based on the smallest distance between any two points;
+    Complete linkage: joins clusters based on the largest distance between points;
+    Average linkage: joins clusters based on the average distance between all points.
+This allowed us to explore how genes group together based on similar expression patterns.
+
+
+```{r}
+
+# Complete linkage
+cluster_complete <- hclust(euclidean_dist_genes)
+plot(cluster_complete, xlab = "", ylab = "Distance", 
+     main = "Dendrogram of Top 30 Differentially Expressed Genes\nMethod: Complete Linkage, Euclidean Distance")
+
+# Single linkage
+cluster_single <- hclust(euclidean_dist_genes, method = "single")
+plot(cluster_single, xlab = "", ylab = "Distance", 
+     main = "Dendrogram of Top 30 Differentially Expressed Genes\nMethod: Single Linkage, Euclidean Distance")
+
+# Average linkage
+cluster_average <- hclust(euclidean_dist_genes, method = "average")
+plot(cluster_average, xlab = "", ylab = "Distance", 
+     main = "Dendrogram of Top 30 Differentially Expressed Genes\nMethod: Average Linkage, Euclidean Distance")
+
+# Heatmap of the top 30 genes
+heatmap(ranked_gene_matrix, labCol = FALSE)
+```
+The **average linkage dendrogram** offers the clearest clustering structure among the three, making it the best candidate for further biological interpretation.
+  The **heatmap** complements the dendrograms and clearly displays expression patterns, which can help identify gene signatures or sample subtypes.
+
+# Sample Clustering
+We also applied hierarchical clustering to samples (patients).
+In this case, the matrix was transposed, and distances were calculated between samples using the selected genes.
+The same linkage methods (single, complete, average) were used to compare how patients cluster.
+We also created heatmaps to visualize expression patterns and support the dendrogram results.
+
+```{r}
+# Sample-Based Clustering (Hierarchical)
+
+# Use transposed matrix to focus on samples
+ttest_results_samples <- rowttests(t(rna_expression_matrix))
+sample_pvalue_ranking <- order(ttest_results_samples$p.value)
+top_sample_indices <- sample_pvalue_ranking[1:30]
+
+ranked_sample_matrix <- rna_expression_transposed[top_sample_indices,]
+euclidean_dist_samples <- dist(ranked_sample_matrix)
+
+# Complete linkage
+sample_cluster_complete <- hclust(euclidean_dist_samples)
+plot(sample_cluster_complete, xlab = "", ylab = "Distance", 
+     main = "Dendrogram of Top 30 Samples\nMethod: Complete Linkage, Euclidean Distance")
+
+# Single linkage
+sample_cluster_single <- hclust(euclidean_dist_samples, method = "single")
+plot(sample_cluster_single, xlab = "", ylab = "Distance", 
+     main = "Dendrogram of Top 30 Samples\nMethod: Single Linkage, Euclidean Distance")
+
+# Average linkage
+sample_cluster_average <- hclust(euclidean_dist_samples, method = "average")
+plot(sample_cluster_average, xlab = "", ylab = "Distance", 
+     main = "Dendrogram of Top 30 Samples\nMethod: Average Linkage, Euclidean Distance")
+
+# Heatmap of the samples
+heatmap(ranked_sample_matrix,
+        scale = "row",                   # Normalize each gene across samples
+        labCol = FALSE,
+        col = colorRampPalette(c("blue", "white", "red"))(100))  # More expressive colors
+
+```
+
+For nearly every gene, the expression values in most samples are below average.
+There may be very little variation within our selected top 30 samples.
+
+
+## 2. K-means Clustering
+
+K-means is a clustering algorithm that divides data into a set number (K) of groups. It does this by placing each data point into the group with the nearest center (centroid), and then adjusting the centers to improve the fit. The goal is to make sure that items in the same group are close to the center and each other.
+
+# Finding the Best Number of Clusters
+We used the **elbow method** to find the best number of clusters.
+The algorithm was run for K = 2 to K = 10.
+For each K, we calculated the within-cluster sum of squares (WSS) — a measure of how tightly packed the points are inside each cluster.
+We then plotted WSS vs. K to find the “elbow” point — the spot where increasing K doesn’t improve the result much. This is often a good choice for the number of clusters.
+
+```{r}
+
+# Determine optimal number of clusters using the elbow method
+withinss_values <- c()
+for (k in 2:10) {
+  kmeans_result <- kmeans(t(rna_expression_matrix), centers = k, nstart = 10)
+  withinss_values <- c(withinss_values, kmeans_result$tot.withinss)
+}
+
+plot_data <- data.frame(num_clusters = 2:10, wss = withinss_values)
+
+ggplot(plot_data, aes(x = num_clusters, y = wss)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Number of Clusters", y = "Within-Cluster Sum of Squares (WSS)") +
+  theme_minimal()
+```
+
+The WSS decreases as K increases — which is expected, since more clusters naturally reduce the within-group variability.
+However, the rate of improvement slows down after a certain point.
+From visual inspection:
+  There’s a noticeable inflection point around K = 4.
+  Beyond that, the WSS reduction is more gradual — suggesting diminishing returns.
+
+## Comparing Clusters to Clinical Data
+
+Once we chose a value for K, we ran K-means again to group the samples.
+We then compared the group assignments with a known clinical variable (vital_status) using a cross-tabulation table.
+```{r}
+# K-Means Clustering vs. Clinical Variable
+
+# Use K = 4 clusters (based on elbow plot or prior knowledge)
+kmeans_final <- kmeans(t(rna_expression_matrix), centers = 4)
+cluster_assignments <- kmeans_final$cluster
+
+# Compare cluster assignments with clinical variable (e.g., vital_status)
+comparison_table <- table(cluster_assignments, ddsSE$vital_status)
+comparison_table
+
+```
+
+This helped us see whether the clusters based on gene expression align with known patient outcomes, possibly revealing meaningful biological differences.
+
+**Cluster 1**: The largest cluster — contains 223 patients with a nearly balanced but still slightly higher number of Alive (128 vs 95). This might represent a core group with average expression profiles.
+**Cluster 2**: Shows 23 Alive vs 14 Dead, suggesting a slightly more favorable survival group.
+**Cluster 3**: The smallest cluster — only 22 samples, but fairly balanced (8 vs 14).
+**Cluster 4**: Also small, with 26 Alive vs 15 Dead — again, mildly enriched for Alive.
+
+### Supervised Analysis
+
+Supervised analysis is a machine learning approach where models are trained using an input dataset along with known labels (outcomes) associated with those data points.  
+During training, the model learns the relationship between the input features and their labels by iteratively adjusting its internal parameters to minimize the error between its predictions and the true labels.  
+After training, the model is used to predict the classification or outcome of new, unseen data.
+
+For gene expression data, machine learning models can serve various purposes.  
+For example, they can predict clinical phenotypes based on gene expression profiles, such as estimating a patient’s response to a particular treatment or predicting disease severity and its progression over time.
+
+---
+
+## Steps for LUAD Gene Expression Data
+
+**1. Data Preparation**  
+We first prepare the normalized gene expression data for use in model training and testing.  
+We set a random seed to make the results reproducible.  
+We extract the normalized count data from the differential expression analysis object (e.g., `dgeObj`).  
+We rank the genes by their *p*-values from the differential expression analysis, keeping only the significantly differentially expressed genes for machine learning.  
+This filtering is important because non-differentially expressed genes show little variation and are poor predictors for sample classification.
+
+**2. Reshape the Data**  
+Because machine learning models work by classifying samples based on their features (here, genes), we transpose the count matrix so that samples are in the rows and genes are in the columns.
+
+**3. Split Into Training and Test Sets**  
+We divide the dataset into ~70% for training and ~30% for testing.  
+We check that the proportion of outcome classes (e.g., “dead” vs. “alive”) is preserved in both sets to avoid class imbalance, ensuring that no group is over- or under-represented, which helps build more accurate and robust models.
+
+**4. Cross-Validation**  
+We set up **10-fold cross-validation** to evaluate model performance reliably.  
+In this setup, the training data is divided into 10 parts (“folds”); in each iteration, one fold is used as validation while the other nine are used for training.  
+The model is repeatedly trained and evaluated on different combinations of folds.  
+We configure this setup using the `trainControl()` function from the `caret` package.
+
+```{r}
+# Set seed for reproducibility
+set.seed(42)
+
+# Parameters
+top_n_genes <- 100  # Change based on the computational viability
+train_frac <- 0.7
+
+# Data preparation
+rna_data <- data.frame(dgeObj$counts)
+filtered_results_ord <- filtered_results$table[order(filtered_results$table$PValue), ]
+de_genes <- rownames(head(filtered_results_ord, top_n_genes))
+
+# Create combined dataset 
+rna_data_vital_status <- data.frame(
+  vital = factor(filtered_data$vital_status), 
+  t(rna_data)[, de_genes, drop = FALSE]
+)
+
+# Ensure valid factor levels for modeling
+levels(rna_data_vital_status$vital) <- make.names(levels(rna_data_vital_status$vital))
+
+# Data validation
+stopifnot(!any(is.na(rna_data_vital_status)))
+stopifnot(all(de_genes %in% colnames(rna_data_vital_status)))
+
+# Split data
+train_idx <- createDataPartition(rna_data_vital_status$vital, p = train_frac, list = FALSE)
+train_set <- rna_data_vital_status[train_idx, ]
+test_set <- rna_data_vital_status[-train_idx, ]
+
+# Check dimensions of the splits
+cat("Training set dimensions:", dim(train_set), "\n")
+cat("Test set dimensions:", dim(test_set), "\n")
+
+# Check class balance
+cat("\nClass proportions:\n")
+cat("- Full dataset:\n")
+print(prop.table(table(rna_data_vital_status$vital)))
+cat("\n- Training set:\n")
+print(prop.table(table(train_set$vital)))
+cat("\n- Test set:\n")
+print(prop.table(table(test_set$vital)))
+```
+
+```{r}
+# Create 10 cross-validation folds, stratified by class
+folds <- createFolds(train_set$vital, k = 10, list = TRUE)
+
+# Set up training control with correct fold indices
+cv_control <- trainControl(
+  method = "cv",
+  number = 10,
+  index = folds,
+  savePredictions = "final",
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,  # Add if doing binary classification
+  verboseIter = TRUE  # Recommended to see progress
+)
+```
+
+```{r}
+# List of models to compare with tuning parameters
+models <- list(
+  rf = list(method = "rf", tuneLength = 5),
+  svmRadial = list(method = "svmRadial", tuneLength = 5),
+  glm = list(method = "glm"),
+  knn = list(method = "knn", tuneLength = 10)
+)
+
+# Store results
+model_list <- list()
+
+# Train each model
+for (m in names(models)) {
+  set.seed(42)
+  cat("Training:", m, "\n")
+  
+  # Create specific arguments list
+  args <- list(
+    x = train_set[, -which(names(train_set) == "vital")],  # predictors
+    y = train_set$vital,                                  # outcome
+    method = models[[m]]$method,
+    trControl = cv_control,
+    preProcess = c("center", "scale")
+  )
+  
+  # Add model-specific arguments
+  if (!is.null(models[[m]]$tuneLength)) {
+    args$tuneLength <- models[[m]]$tuneLength
+  }
+  if (m == "glm") {
+    args$family <- binomial()  # Note: binomial() function, not string
+  }
+  
+  model_list[[m]] <- do.call(train, args)
+}
+
+```
+
+```{r}
+# Compare models
+resamps <- resamples(model_list)
+
+# Summary metrics
+summary(resamps)
+
+# Visual comparison
+dotplot(resamps, metric = "ROC")  # Or "Accuracy"/other metrics
+
+# Identify best model (based on ROC)
+perf_metrics <- sapply(model_list, function(x) max(x$results$ROC, na.rm = TRUE))
+best_model_name <- names(which.max(perf_metrics))
+best_model <- model_list[[best_model_name]]
+
+cat("\nBest model is:", best_model_name, "with ROC of", max(perf_metrics), "\n")
+
+# Evaluate on test set
+test_pred <- predict(best_model, newdata = test_set)  # Consistent naming
+conf_mat <- confusionMatrix(test_pred, test_set$vital, positive = levels(test_set$vital)[2])
+print(conf_mat)
+
+# ROC analysis
+if(nlevels(test_set$vital) == 2) {  # Only for binary classification
+  test_prob <- predict(best_model, newdata = test_set, type = "prob")[, 2]
+  roc_obj <- roc(response = test_set$vital, predictor = test_prob)
+  plot(roc_obj, print.auc = TRUE)
+  cat("AUC on test set:", auc(roc_obj), "\n")
+}
+
+```
+
 
 ### Bibliography
 
