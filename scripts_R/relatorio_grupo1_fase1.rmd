@@ -8,11 +8,18 @@ date: "`r Sys.Date()`"
 output:
   html_document:
     df_print: paged
-  pdf_document: default
-  word_document: default
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly     
+    highlight: tango  
+    number_sections: true
+    df_print: paged   
+    css: "custom.css" 
 ---
 <img src="EEUMLOGO.png" alt="Logo da Empresa" style="float:right; margin: 10px 10px 0 0; width: 110px; height: auto;" />
 
+{.tabset}
 # Phase 1 {.tabset} 
 
 
@@ -205,7 +212,7 @@ The richness and scale of this dataset make it an invaluable resource for:
 The comprehensive nature of the TCGA-LUAD dataset supports efforts in understanding the molecular mechanisms driving lung adenocarcinoma and developing personalized therapeutic strategies. By integrating clinical variables with genomic data, this resource enables a multidimensional approach to investigating one of the most common and lethal cancer subtypes.
 
 
-## Data Pre-Processing
+## Data Pre-Processing {.tabset}
 
 In this stage, we preprocess the dataset to ensure its quality for differential expression and enrichment analysis. First, we separate the gene expression data from the metadata, structuring the dataset for efficient analysis. Then, we apply filtering techniques to remove noise, retaining only biologically relevant information that will enhance the accuracy of downstream analyses.
 
@@ -766,7 +773,7 @@ resOrdered[1,]
 
 Together, these observations support the global trend identified in the analysis and highlight genes that may be biologically relevant in the context of survival.
 
-### edgeR
+#### edgeR
 
 To mitigate biases introduced by differences in sequencing depth or library size, normalization of the raw count data was performed prior to downstream analyses such as differential expression testing. This step is critical to ensure meaningful biological comparisons between samples.
 The `cpm()` function is used to normalize raw count data (ADC_data) by converting it into Counts Per Million (CPM). This method adjusts for differences in library sizes across samples, making the data comparable.
@@ -878,7 +885,7 @@ This version appears to show fewer significantly regulated genes, as seen by the
     The downregulated genes (blue) also appear mostly in low-expression regions.
 While the trend of downregulation in the "Dead" group still exists, the number of differentially expressed genes is lower, suggesting that after stricter filtering the DE genes and focus only on the genes that are most biologically significant, only the most robust changes are retained.
 
-### Enrichment analysis
+#### Enrichment analysis
 
 The goal of this section is to identify genes whose expression levels differ significantly between the two clinical conditions ("Alive" vs. "Dead") and prepare the results for downstream enrichment analysis. We use a generalized linear model (GLM) approach implemented in the edgeR package to perform this task.
 
@@ -1041,9 +1048,12 @@ duplicated_genes = names(ranks)[duplicated(names(ranks))]
 ranks = ranks[!names(ranks) %in% duplicated_genes]
 ```
 
-```{r, warning=FALSE, message=False}
-
-fgseaRes = fgsea(pathways = path, stats = ranks, minSize = 15, maxSize = 500, nproc=1)
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+fgseaRes <- suppressMessages(
+  invisible(
+    fgsea(pathways = path, stats = ranks, minSize = 15, maxSize = 500, nproc = 1)
+  )
+)
 sum(fgseaRes[, padj<0.01])
 
 res_ord = fgseaRes[order(padj),]
@@ -1066,7 +1076,7 @@ head(enrichment)
 ```
 
 
-# Phase 2 - Unsupervised Analysis
+# Phase 2 - Unsupervised Analysis {.tabset}
 
 ## 1. Dimensionality Reduction {.tabset}
 
@@ -1096,13 +1106,6 @@ min(which(summary(pcares1)$importance[3,] > 0.95))
 In this dataset, consisting of **60,660 genes** and **600 samples**, it was determined that **253 principal components** are required to explain **at least 95% of the total variance**.
 This reflects the effect of using log-transformed CPM values, which distributes variance more evenly across components and reduces the dominance of highly expressed genes.
 The variance plot demonstrates that the **first two principal components** capture only a modest portion of the total variability. Nevertheless, they are still useful for an initial low-dimensional visualization of the data structure, although deeper patterns are likely embedded in higher-order components.
-
-
-```{r}
-head(pcares1$rotation[, 1:253])
-
-```
-
 
 
 ```{r, echo=FALSE, warning=FALSE}
@@ -1235,7 +1238,6 @@ Before running t-SNE, we removed duplicate entries and used the PCA-reduced data
 
 ```{r, message=FALSE, warning=FALSE}
 # Remove duplicated rows (required by t-SNE)
-rownames(pca_data)
 dados_CPM_nd <- pca_data[!duplicated(pca_data),]
 dim(dados_CPM_nd)
 rownames(dados_CPM_nd) <- rownames(pca_data)[!duplicated(pca_data)]
@@ -1358,7 +1360,7 @@ This indicates that while UMAP captures meaningful relationships in the data, **
 
 UMAP projections revealed more defined structures compared to PCA and t-SNE, with denser local groupings and clearer spatial organization. However, these structures did not correspond to the available clinical features, reinforcing the likelihood that **other, unmeasured biological factors** underlie the observed transcriptomic variation.
 
-### Clustering {.tabset}
+## Clustering {.tabset}
 
 Clustering is a type of unsupervised machine learning that finds hidden patterns in data by grouping similar items together. It uses distance or similarity measurements to form groups (clusters) so that items in the same group are as similar as possible, and items in different groups are as different as possible.
 In this analysis, we used two main clustering methods:
@@ -1374,7 +1376,7 @@ rna_expression_matrix <- as.matrix(assay(ddsSE_normalized))
 rna_expression_transposed <- t(rna_expression_matrix)
 ```
 
-#### 1. Hierarchical Clustering
+### 1. Hierarchical Clustering
 
 Hierarchical clustering follows a bottom-up approach. It starts with each item as its own cluster and then gradually combines the closest clusters until all items are in a single group.
 We use **Euclidean distance** to measure how similar two profiles are. This is a standard way of measuring straight-line distance between points in multi-dimensional space.
@@ -1542,7 +1544,7 @@ This helped us see whether the clusters based on gene expression align with know
 **Cluster 3**: The smallest cluster — only 22 samples, but fairly balanced (8 vs 14).
 **Cluster 4**: Also small, with 26 Alive vs 15 Dead — again, mildly enriched for Alive.
 
-## Supervised Analysis {.tabset}
+## Supervised Analysis
 
 Supervised analysis is a machine learning approach where models are trained using an input dataset along with known labels (outcomes) associated with those data points.  
 During training, the model learns the relationship between the input features and their labels by iteratively adjusting its internal parameters to minimize the error between its predictions and the true labels.  
