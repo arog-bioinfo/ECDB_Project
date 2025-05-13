@@ -8,11 +8,18 @@ date: "`r Sys.Date()`"
 output:
   html_document:
     df_print: paged
-  pdf_document: default
-  word_document: default
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly     
+    highlight: tango  
+    number_sections: true
+    df_print: paged   
+    css: "custom.css" 
 ---
 <img src="EEUMLOGO.png" alt="Logo da Empresa" style="float:right; margin: 10px 10px 0 0; width: 110px; height: auto;" />
 
+{.tabset}
 # Phase 1 {.tabset} 
 
 
@@ -29,54 +36,56 @@ This section presents all the packages used in this work, which support data acq
 ```{r, results='hide', warning = FALSE, message=FALSE}
 
 # Install BiocManager if not already installed
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#   install.packages("BiocManager")
 
 # List of Bioconductor packages
-bioc_packages <- c(
-  "TCGAbiolinks",
-  "DESeq2",
-  "Biobase",
-  "genefilter",
-  "pheatmap",
-  "org.Hs.eg.db",
-  "fgsea",
-  "SummarizedExperiment",
-  "Glimma",
-  "edgeR",
-  "AnnotationDbi"
-)
+# bioc_packages <- c(
+#   "TCGAbiolinks",
+#   "DESeq2",
+#   "Biobase",
+#   "genefilter",
+#   "pheatmap",
+#   "org.Hs.eg.db",
+#   "fgsea",
+#   "SummarizedExperiment",
+#   "Glimma",
+#   "edgeR",
+#   "AnnotationDbi"
+# )
 
 # Install missing Bioconductor packages
-for (pkg in bioc_packages) {
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    BiocManager::install(pkg, ask = FALSE)
-  }
-}
+# for (pkg in bioc_packages) {
+#   if (!requireNamespace(pkg, quietly = TRUE)) {
+#     BiocManager::install(pkg, ask = FALSE)
+#   }
+# }
 
 # List of CRAN packages
-cran_packages <- c(
-  "jpeg",
-  "ggbeeswarm",
-  "ggplot2",
-  "xfun",
-  "factoextra",
-  "Rtsne",
-  "gplots",
-  "RColorBrewer",
-  "tidyverse",
-  "rpart",
-  "rsample",
-  "caret",
-  "uwot"
-)
+# cran_packages <- c(
+#   "jpeg",
+#   "ggbeeswarm",
+#   "ggplot2",
+#   "xfun",
+#   "factoextra",
+#   "Rtsne",
+#   "gplots",
+#   "RColorBrewer",
+#   "tidyverse",
+#   "rpart",
+#   "rsample",
+#   "caret",
+#   "uwot",
+#   "pROC",
+#   "dendextend"
+# )
 
 # Install missing CRAN packages
-for (pkg in cran_packages) {
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    install.packages(pkg)
-  }
-}
+# for (pkg in cran_packages) {
+#   if (!requireNamespace(pkg, quietly = TRUE)) {
+#     install.packages(pkg)
+#   }
+# }
 
 ```
 
@@ -108,6 +117,9 @@ library(tidyverse)
 library(rpart)
 library(rsample)
 library(caret)
+library(pROC)
+library(dendextend)
+
 ```
 
 ### Data Query and Preparation
@@ -203,7 +215,7 @@ The richness and scale of this dataset make it an invaluable resource for:
 The comprehensive nature of the TCGA-LUAD dataset supports efforts in understanding the molecular mechanisms driving lung adenocarcinoma and developing personalized therapeutic strategies. By integrating clinical variables with genomic data, this resource enables a multidimensional approach to investigating one of the most common and lethal cancer subtypes.
 
 
-## Data Pre-Processing
+## Data Pre-Processing {.tabset}
 
 In this stage, we preprocess the dataset to ensure its quality for differential expression and enrichment analysis. First, we separate the gene expression data from the metadata, structuring the dataset for efficient analysis. Then, we apply filtering techniques to remove noise, retaining only biologically relevant information that will enhance the accuracy of downstream analyses.
 
@@ -211,19 +223,17 @@ In this stage, we preprocess the dataset to ensure its quality for differential 
 ```{r}
 # Extract gene expression matrix
 expression_data <- as.data.frame(assay(rna_seq_LUAD))
+expression_filtered <- expression_data[rowSums(expression_data > 1) > (0.5 * ncol(expression_data)), ]
+
 
 # Extract clinical metadata
 clinical_data <- colData(rna_seq_LUAD)
 
 ```
 
-###Initial Data Exploration
+### Initial Data Exploration
 
 ```{r}
-# Filter genes with low expression
-keep_genes <- rowSums(expression_data > 1) > ncol(expression_data) * 0.5
-expression_filtered <- expression_data[keep_genes, ]
-
 cat("Dimensions:", dim(rna_seq_LUAD)[1], "genes x", dim(rna_seq_LUAD)[2], "samples\n")
 
 # Summaries
@@ -305,7 +315,7 @@ After filtering the variables, we selected the following as our feature variable
   `gender` : Biological sex of the patient (Male or Female --> Categorical Variable). Can influence disease prevalence and progression.
   
 ```{r}
-## GENDER
+# GENDER
 
 barplot(table(clinical_data_filtered@listData[["gender"]]), 
         main = "Distribution of Gender", 
@@ -318,7 +328,7 @@ barplot(table(clinical_data_filtered@listData[["gender"]]),
   
   `race`: Self-reported racial background of the patient (Asian, American indian or Alaska native, Black or African American, White, Not Reported, Unknown --> Categorical Variable). May reflect epidemiological or socio-demographic patterns.
 ```{r}
-## RACE
+# RACE
 
 race_data <- clinical_data_filtered@listData[["race"]]
 race_table <- table(race_data)
@@ -363,10 +373,11 @@ hist(clinical_data_filtered$age_at_diagnosis,
      xlab = "Age",
      col = "snow3",
      breaks = 30,
-       border = "white")  # adjust for bin size
+       border = "white")
 
 ```
-  `primary_diagnosis`: Main clinical diagnosis assigned to the patient (Type of tumor --> Categorical Variable). Will help us understand if the type of the tumor will have influence in our response variable.
+  
+`primary_diagnosis`: Main clinical diagnosis assigned to the patient (Type of tumor --> Categorical Variable). Will help us understand if the type of the tumor will have influence in our response variable.
 
 ```{r}
 diagnosis_data <- clinical_data_filtered@listData[["primary_diagnosis"]]
@@ -405,7 +416,8 @@ pie(
 )
 
 ```
-  `adjj_pathologic_stage`: Represents the overall tumor stage (e.g., Stage I, II, III, IV) based on the AJCC (American Joint Committee on Cancer) system. This is a categorical clinical variable that reflects cancer progression and prognosis. It is highly relevant for survival analysis and differential expression studies, as advanced stages are typically associated with worse outcomes. Sub-stages denoted by letters such as A and B (e.g., IA vs IB) provide a finer classification within each stage, where A generally indicates a less advanced condition than B, often based on tumor size, lymph node involvement, or local invasion.
+
+`adjj_pathologic_stage`: Represents the overall tumor stage (e.g., Stage I, II, III, IV) based on the AJCC (American Joint Committee on Cancer) system. This is a categorical clinical variable that reflects cancer progression and prognosis. It is highly relevant for survival analysis and differential expression studies, as advanced stages are typically associated with worse outcomes. Sub-stages denoted by letters such as A and B (e.g., IA vs IB) provide a finer classification within each stage, where A generally indicates a less advanced condition than B, often based on tumor size, lymph node involvement, or local invasion.
   
 ```{r}
 ggplot(clinical_data_filtered, aes(x = ajcc_pathologic_stage)) +
@@ -417,6 +429,7 @@ ggplot(clinical_data_filtered, aes(x = ajcc_pathologic_stage)) +
   ) +
   theme_minimal()
 ```
+
 The bar plot shows the distribution of AJCC pathologic stages among patients in the dataset. The most common stages are Stage IA and Stage IB, which together represent the majority of cases. Higher stages such as Stage IIIA, IIIB, and IV are progressively less frequent, as expected in a cohort with a range of disease severities.
 
 A small number of patients are labeled as simply "Stage I" without further sub-classification (e.g., IA or IB), and a notable number of samples have missing values (NA). To ensure consistency and analytical accuracy, these samples will be excluded from subsequent analyses.
@@ -445,16 +458,10 @@ barplot(table(clinical_data_filtered$vital_status),
 ```
 
 
-To ensure the reliability of downstream analyses, genes with low expression across the majority of samples were filtered out. Specifically, only genes with counts greater than 1 in more than 50% of the samples were retained. This step helps reduce noise from lowly expressed or non-informative genes.
+As previously described, we applied a gene filtering step to remove lowly expressed or non-informative genes. Specifically, we retained only those with counts greater than 1 in more than 50% of the samples. This early filtering step ensures that downstream analyses are performed on a high-quality, noise-reduced expression dataset.
 
-```{r}
-# Keep only genes where at least 50% of samples have counts >1
-keep = rowSums(expression_data > 1) > (0.5 * ncol(expression_data))
-filtered_data = expression_data[keep, ]
 
-```
-
-### Testes de Hipóteses
+### Hypothesis Testing {.tabset}
 
 As part of the exploratory analysis, hypothesis testing was conducted to evaluate potential associations between key clinical variables and patient outcomes. These tests aim to identify statistically significant differences between groups, guiding further investigation in downstream analyses. In this study, we focused on the variables vital status, gender, race, age at diagnosis, primary diagnosis, and AJCC pathologic stage. These variables were selected due to their biological relevance and potential impact on lung adenocarcinoma progression and prognosis.
 
@@ -503,13 +510,14 @@ ggplot(clinical_df, aes(x = primary_diagnosis, fill = vital_status)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 ```
+
 Among the subtypes, Adenocarcinoma (NOS) and Adenocarcinoma with mixed subtypes were the most represented. Notably, Adenocarcinoma, NOS showed a relatively higher proportion of deceased patients compared to some of the rarer subtypes, such as Acinar cell carcinoma and Mucinous adenocarcinoma, where survival rates appear higher.
 
 However, the smaller sample sizes in certain groups (e.g., Mucinous and Papillary adenocarcinoma) limit the strength of direct comparisons. This variation underscores the importance of histological subtype in patient prognosis and suggests possible biological differences between subtypes.
 
 A Chi-squared test was conducted to statistically evaluate the association between primary diagnosis and vital status. Although some subtypes show trends toward different outcomes, the test result (p = …) will help determine whether these observed differences are statistically significant.
 
-```{r}
+```{r, warning=FALSE}
 chisq.test(table(clinical_df$vital_status, clinical_df$primary_diagnosis))
 
 ```
@@ -521,6 +529,7 @@ fisher.test(table(clinical_df$vital_status, clinical_df$primary_diagnosis), simu
 ```
 
 Although there are visible differences in survival proportions across the primary diagnosis groups, the statistical tests did not find a significant association between vital status and primary diagnosis (p > 0.05 in both tests). This suggests that, within this dataset, histological subtype is not significantly associated with overall survival outcome — though sample size limitations, especially in rarer subtypes, may affect statistical power.
+
 
 #### Vital Status by Gender
 
@@ -534,6 +543,7 @@ geom_text(stat = "count", aes(label = ..count..), position = position_fill(vjust
 labs(title = "Vital Status by Gender", y = "Proportion") +
 theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
+
 The plot illustrates the proportion of patients who are alive or deceased within each gender group. Among females, 142 are alive and 65 are deceased, while among males, 94 are alive and 59 are deceased. Although the absolute number of female patients is higher, the proportional survival appears similar between genders.
 
 No obvious survival advantage is visually evident for either gender in this sample. To determine whether these observed differences are statistically meaningful, a formal hypothesis test is required.
@@ -561,6 +571,7 @@ labs(title = "Vital Status by Race", y = "Proportion") +
 theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
+
 The bar plot displays the distribution of vital status (Alive vs Dead) across two racial groups: Black or African American and White. Among Black or African American patients, 33 were alive and 9 were deceased. In contrast, among White patients, 203 were alive and 115 were deceased.
 
 Although the raw numbers differ due to sample size imbalance, the proportions of survival outcomes appear somewhat different between the groups when examined visually.
@@ -570,6 +581,7 @@ To formally assess whether these differences are statistically significant, a Ch
 ```{r}
 chisq.test(table(clinical_df$vital_status, clinical_df$race))
 ```
+
 Since the p-value is greater than 0.05, we fail to reject the null hypothesis, indicating that there is no statistically significant association between race and vital status in this dataset. However, the p-value is close to the significance threshold, suggesting a possible trend that may warrant further investigation in larger or more balanced samples.
 
 #### Vital Status by AJCC Pathologic Stage
@@ -585,12 +597,13 @@ labs(title = "Vital Status by AJCC Pathologic Stage", y = "Proportion") +
 theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
+
 A clear trend emerges: earlier stages, such as Stage IA, show a higher proportion of patients alive (94 Alive vs 12 Dead), whereas advanced stages like Stage IIIB and Stage IV show a much higher proportion of deceased patients. For example, in Stage IIIB, only 6 patients are alive compared to 11 deceased — illustrating the sharp decline in survival as stage increases.
 
 To statistically assess this relationship, both a Chi-squared test and Fisher’s Exact Test were applied:
 
 
-```{r}
+```{r, warning=FALSE}
 chisq.test(table(clinical_df$vital_status, clinical_df$ajcc_pathologic_stage))
 ```
 ```{r}
@@ -614,6 +627,7 @@ ggplot(clinical_df, aes(x = vital_status, y = age_at_diagnosis , fill = vital_st
   theme(legend.position = "none")  # optional: remove redundant legend
 
 ```
+
 This visual trend suggests a possible relationship between age and survival, where older age at diagnosis may be linked to worse outcomes. However, the overlapping interquartile ranges also indicate that the difference may not be substantial.
 
 ```{r}
@@ -631,6 +645,7 @@ qqline(clinical_df$age_at_diagnosis[clinical_df$vital_status == "Alive"])
 qqnorm(clinical_df$age_at_diagnosis[clinical_df$vital_status == "Dead"])
 qqline(clinical_df$age_at_diagnosis[clinical_df$vital_status == "Dead"])
 ```
+
 The plots show noticeable deviations from the diagonal line, particularly in the tails, further supporting the conclusion that the data are not normally distributed. Given the violation of normality assumptions, we proceeded with a non-parametric Wilcoxon rank-sum test to compare the age distributions between groups.
 
 ```{r}
@@ -640,7 +655,7 @@ Since the p-value is much greater than 0.05, we fail to reject the null hypothes
 
 ## Differential expression and enrichment analysis
 
-### Differential expression analysis
+### Differential expression analysis {.tabset}
 #### DESEQ2
 
 In order to analyze the genes that are differentially expressed in the tumor type **“Adenocarcinoma, NOS”** within **Lung Adenocarcinoma** (TCGA, GDC), based on the patients’ vital status, a data pre-processing step was performed to facilitate and optimize the differential expression analysis while reducing computational time and resource usage.
@@ -656,20 +671,17 @@ Initially, samples with the primary diagnosis **“Adenocarcinoma, NOS”** were
 ```{r}
 diagnosis_table
 
-filtered_diagnosis = clinical_df[clinical_df == "Adenocarcinoma, NOS"]
-data_ADC = expression_data[,rownames((filtered_diagnosis))]
-dim(data_ADC)
+metadata_col = SummarizedExperiment::colData(rna_seq_LUAD)
+geneExp = SummarizedExperiment::assay(rna_seq_LUAD, "unstranded")
+filtered_data <- metadata_col[!is.na(metadata_col$primary_diagnosis) &
+                              metadata_col$primary_diagnosis == "Adenocarcinoma, NOS", ]
+ADC_data <- geneExp[, rownames(filtered_data)]
 ```
 
 ```{r}
-metadata_col = SummarizedExperiment::colData(rna_seq_LUAD)
-geneExp = SummarizedExperiment::assay(rna_seq_LUAD, "unstranded")
+expression_filtered = metadata_col[!is.na(metadata_col$primary_diagnosis),]
+expression_filtered = expression_filtered[expression_filtered$primary_diagnosis=="Adenocarcinoma, NOS",]
 
-filtered_data = metadata_col[!is.na(metadata_col$primary_diagnosis),]
-filtered_data = filtered_data[filtered_data$primary_diagnosis=="Adenocarcinoma, NOS",]
-
-ADC_data = geneExp[,rownames(filtered_data)]
-dim(ADC_data)
 
 ```
 After subsetting the dataset to include only samples with a primary diagnosis of "Adenocarcinoma, NOS", the gene expression matrix (ADC_data) contained **60,660 genes**. Since there were no missing values in the expression data, all annotated genes were initially retained. However, many of these genes either showed no expression or had consistently low expression across the samples, which can introduce noise in downstream analyses. To address this, an additional filtering step was applied to remove genes with zero counts across all samples, as well as those with fewer than 20 counts in fewer than 4 samples. These filtering criteria follow standard guidelines from the DESeq2 workflow, ensuring that only genes with sufficient expression are retained for meaningful differential expression analysis.
@@ -678,8 +690,8 @@ After subsetting the dataset to include only samples with a primary diagnosis of
 Next, we checked for missing values in the **vital status** column. 
 
 ```{r}
-sum(is.na(filtered_data$vital_status))
-filtered_data$vital_status = factor(filtered_data$vital_status)
+sum(is.na(expression_filtered$vital_status))
+expression_filtered$vital_status = factor(expression_filtered$vital_status)
 ```
 Since no missing values were found, the “vital_status” metadata was converted into a factor, as the differential expression analysis using the **DESeq2** package recommends using factors instead of character variables.
 
@@ -687,10 +699,8 @@ After the preprocessing steps, the final dataset included approximately **33,293
 This analysis used a significance threshold of α = 0.05 to identify genes differentially expressed between vital status groups.
 
 ```{r}
-ddsSE = DESeqDataSetFromMatrix(countData = ADC_data, colData = filtered_data, design = ~vital_status)
+ddsSE = DESeqDataSetFromMatrix(countData = ADC_data, colData = expression_filtered, design = ~vital_status)
 
-
-# filtragem de genes com menos de 20 ocorrências em pelo menos 4 amostras
 keep_genes = rowSums(counts(ddsSE) >= 20) >= 4
 ddsSE = ddsSE[keep_genes, ]
 dim(ddsSE)
@@ -698,7 +708,7 @@ dim(ddsSE)
 ```
 After the preprocessing steps, the final dataset included approximately **33,293 genes** and **323 samples**. With this filtered dataset, we created the **DESeqDataSet** object, using the “vital_status” factor as the explanatory variable in the model.
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 ddsSE_norm = DESeq(ddsSE)
 res = results(ddsSE_norm, alpha = 0.05)
 
@@ -735,6 +745,9 @@ percent_DE <- round((sig_genes / total_genes) * 100, 2)
 upregulated <- sum(res$padj < 0.05 & res$log2FoldChange > 0, na.rm = TRUE)
 downregulated <- sum(res$padj < 0.05 & res$log2FoldChange < 0, na.rm = TRUE)
 
+```
+```{r, echo=FALSE}
+
 # Print results
 cat("Total tested genes:", total_genes, "\n")
 cat("Significantly DE genes:", sig_genes, "(", percent_DE, "% )\n")
@@ -763,14 +776,15 @@ resOrdered[1,]
 
 Together, these observations support the global trend identified in the analysis and highlight genes that may be biologically relevant in the context of survival.
 
-### edgeR
+#### edgeR
 
 To mitigate biases introduced by differences in sequencing depth or library size, normalization of the raw count data was performed prior to downstream analyses such as differential expression testing. This step is critical to ensure meaningful biological comparisons between samples.
 The `cpm()` function is used to normalize raw count data (ADC_data) by converting it into Counts Per Million (CPM). This method adjusts for differences in library sizes across samples, making the data comparable.
 
 ```{r}
 # Normalization of count data
-ADC_data_CPM = cpm(ADC_data)
+ADC_data_CPM <- cpm(ADC_data)
+ADC_data_CPM_log <- cpm(ADC_data, log = TRUE)
 dim(ADC_data_CPM)
 ```
 The `cpm()` function from the edgeR package was used to convert raw counts in ADC_data into Counts Per Million (CPM). This normalization accounts for library size by scaling the raw counts relative to the total number of reads per sample, multiplied by one million. The resulting ADC_data_CPM matrix contains normalized expression values that are directly comparable across samples. The `dim()` function is then used to inspect the dimensions of the resulting CPM matrix, providing a quick check on the number of genes and samples retained after normalization.
@@ -810,7 +824,7 @@ After creating the DGEList object dgeObj containing raw count data, normalizatio
 To perform a differential expression analysis, a design matrix is constructed to specify the experimental conditions. 
 ```{r}
 # Differential expression analysis
-vital_status = as.factor(filtered_data$vital_status)
+vital_status = as.factor(expression_filtered$vital_status)
 design = model.matrix(~vital_status)
 ```
 Here, vital_status ("Alive" vs. "Dead") is extracted from the metadata and converted into a factor to indicate categorical grouping. The model.matrix() function then builds a design matrix based on this grouping, where the intercept represents one condition (the baseline), and the second column represents the contrast of interest. 
@@ -874,12 +888,12 @@ This version appears to show fewer significantly regulated genes, as seen by the
     The downregulated genes (blue) also appear mostly in low-expression regions.
 While the trend of downregulation in the "Dead" group still exists, the number of differentially expressed genes is lower, suggesting that after stricter filtering the DE genes and focus only on the genes that are most biologically significant, only the most robust changes are retained.
 
-### Enrichment analysis
+#### Enrichment analysis
 
 The goal of this section is to identify genes whose expression levels differ significantly between the two clinical conditions ("Alive" vs. "Dead") and prepare the results for downstream enrichment analysis. We use a generalized linear model (GLM) approach implemented in the edgeR package to perform this task.
 
 ```{r}
-vital_status = as.factor(filtered_data$vital_status)
+vital_status = as.factor(expression_filtered$vital_status)
 design = model.matrix(~vital_status)
 
 dgeObj = estimateDisp(dgeObj, design = design)
@@ -976,10 +990,12 @@ All 4 genes show statistically significant differential expression (padj < 0.01)
 ```{r}
 # Analysis of the study genes signaled as differentially expressed
 
-plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000122711.9"), intgroup="vital_status", pch = 19)
-plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000130055.14"), intgroup="vital_status", pch = 19)
-plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000185269.12"), intgroup="vital_status", pch = 19)
-plotCounts(ddsSE_norm, gene=which(rownames(res)=="ENSG00000145692.15"), intgroup="vital_status", pch = 19)
+genes_to_plot <- c("ENSG00000122711.9", "ENSG00000130055.14", "ENSG00000185269.12", "ENSG00000145692.15")
+
+for (gene in genes_to_plot) {
+  plotCounts(ddsSE_norm, gene = which(rownames(res) == gene), intgroup = "vital_status", pch = 19)
+}
+
 
 ```
 
@@ -1030,17 +1046,17 @@ names(ranks) = results_ord$gene_name
 results_ord = res[order(-res[,"log2FoldChange"]), ]
 
 
-# Identificar genes duplicados
+# Identify and Remove duplicated genes genes duplicados
 duplicated_genes = names(ranks)[duplicated(names(ranks))]
-# Remover genes duplicados
 ranks = ranks[!names(ranks) %in% duplicated_genes]
 ```
 
-```{r}
-
-# Executar a análise FGSEA com os genes não duplicados
-fgseaRes = fgsea(pathways = path, stats = ranks, minSize = 15, maxSize = 500, nproc=1)
-# número de vias enriquecidas
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+fgseaRes <- suppressMessages(
+  invisible(
+    fgsea(pathways = path, stats = ranks, minSize = 15, maxSize = 500, nproc = 1)
+  )
+)
 sum(fgseaRes[, padj<0.01])
 
 res_ord = fgseaRes[order(padj),]
@@ -1048,24 +1064,22 @@ res_ord[res_ord[, padj<0.01]]
 ```
 
 ```{r}
-#salvar o resultado da análise de enriquecimento ordenado
 write.csv(as.data.frame(res_ord[,1:6]), file = "enrichemnt_analysiss.csv", row.names = T)
 ```
 
 ```{r}
-# leitura dos resultados da análise de enriquecimento
+#enrichment data
 enrichment = enrichemnt_analysiss <- read.csv("enrichemnt_analysiss.csv", row.names=1)
 ```
 
 ```{r}
-# através do ficheiro csv número de vias enriquecidas
 sum(enrichment$padj<0.01)
 
 head(enrichment)
 ```
 
 
-# Phase 2 - Unsupervised Analysis
+# Phase 2 - Unsupervised Analysis {.tabset}
 
 ## 1. Dimensionality Reduction {.tabset}
 
@@ -1079,10 +1093,9 @@ In this analysis, we used a combination of:
 
 These methods complement each other: PCA provides a general overview of variance across the dataset, while t-SNE and UMAP allow for more refined visualization of local similarities and potential sample groupings. Together, they offer a robust approach to exploring underlying structures that may reflect biological or clinical relevance.
 
-## PCA (Principal Component Analysis)
+### PCA (Principal Component Analysis)
 
 ```{r}
-ADC_data_CPM_log= cpm(ADC_data, log = TRUE, prior.count = 1)
 pca_data = t(ADC_data_CPM_log)  # transpose: samples in columns, genes in rows
 
 
@@ -1092,16 +1105,10 @@ summary(pcares1)$importance[3, ]
 
 min(which(summary(pcares1)$importance[3,] > 0.95))
 ```
+
 In this dataset, consisting of **60,660 genes** and **600 samples**, it was determined that **253 principal components** are required to explain **at least 95% of the total variance**.
 This reflects the effect of using log-transformed CPM values, which distributes variance more evenly across components and reduces the dominance of highly expressed genes.
 The variance plot demonstrates that the **first two principal components** capture only a modest portion of the total variability. Nevertheless, they are still useful for an initial low-dimensional visualization of the data structure, although deeper patterns are likely embedded in higher-order components.
-
-
-```{r}
-head(pcares1$rotation[, 1:253])
-
-```
-
 
 
 ```{r, echo=FALSE, warning=FALSE}
@@ -1148,7 +1155,7 @@ The PCA scatterplot of the first two principal components, based on log-transfor
 
 Furthermore, the explained variance plot reveals that **253 components** are required to account for at least **95% of the total variance**, reflecting the high dimensionality and complexity of the transcriptomic data. This distribution suggests that meaningful biological patterns may be embedded in higher-order or nonlinear dimensions, motivating the use of alternative dimensionality reduction techniques such as t-SNE and UMAP.
 
-## PCA by Clinical Variables {.tabset}
+#### PCA by Clinical Variables
 
 To better investigate the potential biological or clinical groupings within the data, the PCA results were visualized with samples colored by key clinical features. These visualizations help assess whether specific sample groupings, observed in lower-dimensional space, correlate with clinical variables such as **vital status**, **primary diagnosis**, **gender**, **race**, **AJCC stage**, or **age at diagnosis**.
 
@@ -1196,7 +1203,7 @@ ggplot(pca_df_merged, aes(x = PC1, y = PC2, color = age_at_diagnosis, shape = vi
   theme_minimal()
 ```
 
-### **Interpretation of PCA by Clinical Variables**
+**Interpretation of PCA by Clinical Variables**
 
 Visualizing the first two principal components after log-transformation, colored by clinical variables, confirms several key limitations of linear dimensionality reduction in this context:
 
@@ -1212,7 +1219,7 @@ Visualizing the first two principal components after log-transformation, colored
 
 ---
 
-### **Conclusion and Justification for Nonlinear Methods**
+**Conclusion and Justification for Nonlinear Methods**
 
 These updated PCA results, using log-transformed data, further emphasize that **linear projections fail to reveal meaningful clinical or biological structure**. The lack of visible grouping supports the need for **nonlinear dimensionality reduction techniques**, which can capture relationships that do not lie along straight axes.
 
@@ -1226,7 +1233,7 @@ These methods are more suitable for revealing potentially **nonlinear biological
 
 
 
-## t-SNE (t-Distributed Stochastic Neighbor Embedding)
+### t-SNE (t-Distributed Stochastic Neighbor Embedding)
 
 t-SNE is a non-linear dimensionality reduction technique that maps high-dimensional data to a low-dimensional space by preserving the probability distribution of pairwise similarities. It is particularly well-suited to reveal **local clusters** or subgroup patterns that PCA might miss due to its linear nature.
 
@@ -1234,7 +1241,6 @@ Before running t-SNE, we removed duplicate entries and used the PCA-reduced data
 
 ```{r, message=FALSE, warning=FALSE}
 # Remove duplicated rows (required by t-SNE)
-rownames(pca_data)
 dados_CPM_nd <- pca_data[!duplicated(pca_data),]
 dim(dados_CPM_nd)
 rownames(dados_CPM_nd) <- rownames(pca_data)[!duplicated(pca_data)]
@@ -1258,7 +1264,6 @@ tsne_df_final <- cbind(tsne_df, clinical_df_filtered)
 Now, we visualize the t-SNE embeddings colored by clinical and demographic attributes:
 
 ```{r, message=FALSE, warning=FALSE}
-library(ggplot2)
 
 # t-SNE by Vital Status and Gender
 ggplot(tsne_df_final, aes(x = tSNE1, y = tSNE2, color = gender, shape = vital_status)) +
@@ -1292,7 +1297,7 @@ ggplot(tsne_df_final, aes(x = tSNE1, y = tSNE2, color = age_at_diagnosis, shape 
   labs(title = "t-SNE: Age & Vital Status")
 ```
 
-### **Interpretation of t-SNE by Clinical Variables**
+**Interpretation of t-SNE by Clinical Variables**
 
 The t-SNE embeddings, computed from log-transformed data, reveal **no clear separation** between clinical or demographic groups. Samples remain largely intermixed across all variables, including **gender**, **race**, **AJCC stage**, **age**, and **vital status**.
 
@@ -1301,7 +1306,7 @@ While t-SNE exposes some local structure, these patterns **do not align with any
 These results reinforce the conclusion that **the clinical variables analyzed do not correspond to distinct transcriptomic profiles**, even in a nonlinear embedding.
 
 
-## UMAP (Uniform Manifold Approximation and Projection)
+### UMAP (Uniform Manifold Approximation and Projection)
 
 UMAP is another powerful non-linear method that builds on manifold learning and topological data analysis. Compared to t-SNE, UMAP generally offers **better global structure retention** and can be tuned to emphasize either local or global features.
 
@@ -1347,19 +1352,406 @@ ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = age_at_diagnosis, shape = vita
   labs(title = "UMAP: Age & Vital Status")
 ```
 
-### **Interpretation of UMAP by Clinical Variables**
+**Interpretation of UMAP by Clinical Variables**
 
 The UMAP projections reveal structured groupings in the transcriptomic space, with some visible clustering. However, these clusters do not align with any of the clinical or demographic variables considered — including **gender**, **race**, **AJCC stage**, **age**, or **vital status**.
 
 This indicates that while UMAP captures meaningful relationships in the data, **the observed structure is likely driven by latent biological or technical factors**, rather than the available clinical annotations.
 
 
-### **Final Remarks on UMAP**
+**Final Remarks on UMAP**
 
 UMAP projections revealed more defined structures compared to PCA and t-SNE, with denser local groupings and clearer spatial organization. However, these structures did not correspond to the available clinical features, reinforcing the likelihood that **other, unmeasured biological factors** underlie the observed transcriptomic variation.
 
+## Clustering {.tabset}
 
-### Bibliography
+Clustering is a type of unsupervised machine learning that finds hidden patterns in data by grouping similar items together. It uses distance or similarity measurements to form groups (clusters) so that items in the same group are as similar as possible, and items in different groups are as different as possible.
+In this analysis, we used two main clustering methods:
+*1. Hierarchical Clustering*: builds a tree-like diagram (dendrogram) by repeatedly joining the closest items or groups without needing to set the number of clusters in advance.
+*2. K-means Clustering*: splits the data into a fixed number (K) of groups by minimizing the distances between items and the center (centroid) of their group.
+
+Before clustering, we converted the normalized gene expression data into a matrix format. Since the clustering methods need numerical matrices, this step ensures that the data can be processed. For sample-based analysis, we also transposed the matrix so that samples are in the rows and genes are in the columns.
+
+
+```{r}
+# Normalize RNA-seq data using DESeq
+ddsSE_normalized <- DESeq(ddsSE)
+rna_expression_matrix <- as.matrix(assay(ddsSE_normalized))
+rna_expression_transposed <- t(rna_expression_matrix)
+```
+
+### 1. Hierarchical Clustering
+
+Hierarchical clustering follows a bottom-up approach. It starts with each item as its own cluster and then gradually combines the closest clusters until all items are in a single group.
+We use *Euclidean distance* to measure how similar two profiles are. This is a standard way of measuring straight-line distance between points in multi-dimensional space.
+
+
+
+```{r}
+# Select top 30 most variable genes (unsupervised)
+gene_variances <- apply(rna_expression_matrix, 1, var)
+top_gene_indices <- order(gene_variances, decreasing = TRUE)[1:30]
+ranked_gene_matrix <- rna_expression_matrix[top_gene_indices, ]
+
+# Compute Euclidean distance
+euclidean_dist_genes <- dist(ranked_gene_matrix)
+
+
+```
+
+#### Gene Clustering
+
+To investigate patterns of co-expression among genes, we performed hierarchical clustering on a subset of genes selected in an unsupervised manner.
+We selected the top 30 most variable genes across all samples by ranking genes according to their expression variance. This approach emphasizes genes with the greatest natural variation — a key strategy in unsupervised analysis — and avoids introducing bias from predefined clinical or biological labels.
+We then computed the *Euclidean distance* between the expression profiles of these genes and applied three different hierarchical clustering methods to explore how genes group based on similar expression patterns:
+  *Single linkage*: clusters are joined based on the smallest distance between any two points.
+  *Complete linkage*: uses the largest distance between points in different clusters.
+  *Average linkage*: uses the average distance between all points in two clusters.
+This comparison helps assess the stability and structure of the gene groupings under different assumptions of similarity.
+
+
+
+```{r}
+
+# Complete linkage
+cluster_complete <- hclust(euclidean_dist_genes)
+plot(cluster_complete, xlab = "", ylab = "Distance", 
+     main = "Dendrogram of Top 30 Most Variable Genes\nMethod: Complete Linkage")
+
+# Single linkage
+cluster_single <- hclust(euclidean_dist_genes, method = "single")
+plot(cluster_single, xlab = "", ylab = "Distance", 
+     main = "Dendrogram of Top 30 Most Variable Genes\nMethod: Single Linkage")
+
+# Average linkage
+cluster_average <- hclust(euclidean_dist_genes, method = "average")
+plot(cluster_average, xlab = "", ylab = "Distance", 
+     main = "Dendrogram of Top 30 Most Variable Genes\nMethod: Average Linkage")
+
+# Heatmap to visualize expression patterns
+heatmap(ranked_gene_matrix, labCol = FALSE)
+
+
+```
+
+This panel displays three dendrograms (for single, complete, and average linkage) alongside a heatmap of the top 30 most variable genes across samples.
+    The dendrograms illustrate how genes group together based on expression similarity, depending on the linkage strategy.
+    The average linkage dendrogram appears to produce the most coherent and interpretable clusters, balancing both local and global structure.
+    The heatmap visualizes expression values across samples: darker colors indicate lower expression, while lighter colors suggest higher expression.
+    We observe that some genes cluster together with very similar expression profiles across samples, suggesting potential co-regulation or functional relationships.
+
+
+#### Sample Clustering
+
+To explore patterns among samples (patients), we applied *hierarchical clustering* using the same top 30 most variable genes selected previously. These genes were chosen without reference to any clinical labels to ensure the clustering reflects *intrinsic transcriptomic structure*.
+We transposed the matrix so that each *row represents a patient* and *each column represents a gene*, then calculated Euclidean distances between sample profiles. Three clustering methods were applied (single, complete, average linkage), and results were visualized with dendrograms and a heatmap.
+
+
+```{r}
+# Sample-Based Clustering (Hierarchical)
+
+# Transpose the ranked gene matrix: rows = samples, columns = genes
+ranked_sample_matrix <- t(ranked_gene_matrix)
+euclidean_dist_samples <- dist(ranked_sample_matrix)
+
+# Complete linkage
+sample_cluster_complete <- hclust(euclidean_dist_samples)
+plot(sample_cluster_complete, xlab = "", ylab = "Distance", 
+     main = "Dendrogram of Samples\nMethod: Complete Linkage, Euclidean Distance")
+
+# Single linkage
+sample_cluster_single <- hclust(euclidean_dist_samples, method = "single")
+plot(sample_cluster_single, xlab = "", ylab = "Distance", 
+     main = "Dendrogram of Samples\nMethod: Single Linkage, Euclidean Distance")
+
+# Average linkage
+sample_cluster_average <- hclust(euclidean_dist_samples, method = "average")
+plot(sample_cluster_average, xlab = "", ylab = "Distance", 
+     main = "Dendrogram of Samples\nMethod: Average Linkage, Euclidean Distance")
+
+# Heatmap of samples
+heatmap(ranked_sample_matrix,
+        scale = "row",                   # Normalize each gene across samples
+        labCol = FALSE,
+        col = colorRampPalette(c("blue", "white", "red"))(100))
+
+
+
+```
+
+This plot shows hierarchical clustering applied to samples (patients) based on the same top 30 most variable genes.
+    Samples are arranged in a dendrogram, and gene expression is shown using a color-coded row-scaled heatmap (blue = low expression, red = high expression).
+    Some subclusters of patients exhibit coherent expression profiles across multiple genes, indicating potential biological subtypes.
+    However, overall structure is moderately diffuse, reflecting heterogeneity within the cohort — consistent with earlier observations that clinical variables do not align clearly with expression variation.
+
+
+To evaluate potential clinical relevance of sample groupings, we color-coded the hierarchical clustering dendrogram by *vital status* (Alive vs Dead).
+
+```{r}
+plot(sample_cluster_average,
+     main = "Dendrogram of Samples (Average Linkage)",
+     xlab = "", ylab = "Distance",
+     cex = 0.5,     # reduce label size
+     las = 2)       # rotate labels
+
+```
+```{r}
+# Extract clinical variable (ensure it's aligned with sample order)
+vital_status <- as.character(colData(ddsSE)$vital_status)
+names(vital_status) <- colnames(ranked_gene_matrix)  # assign sample names
+
+# Map Alive to green, Dead to red
+status_colors <- ifelse(vital_status == "Alive", "forestgreen", "firebrick")
+
+# Convert to dendrogram object
+dend <- as.dendrogram(sample_cluster_average)
+
+# Add colored labels
+labels_colors(dend) <- status_colors[order.dendrogram(dend)]
+
+# Plot with legend
+plot(dend, main = "Sample Dendrogram Colored by Vital Status")
+legend("topright", legend = c("Alive", "Dead"),
+       fill = c("forestgreen", "firebrick"),
+       border = NA, bty = "n")
+dend <- color_labels(dend, col = status_colors[order.dendrogram(dend)])
+dend <- color_branches(dend, k = 4)  # Cut tree into 4 groups if desired
+plot(dend, main = "Sample Dendrogram with Colored Branches and Labels")
+
+
+
+```
+
+In the *first version*, we retained default branch coloring and used only label colors and a legend for a cleaner visual presentation.
+  In the *second version*, branches were colored to distinguish structural clusters, and labels were colored by clinical outcome. This made it easier to visually identify whether clinical variables correspond to any expression-driven groupings.
+
+While the clusters were defined using unsupervised transcriptomic features, some branch-level enrichment for survival status is apparent. This suggests that transcriptomic variation may partially reflect clinical outcome.
+
+### 2. K-means Clustering
+
+K-means is a clustering algorithm that divides data into a set number (K) of groups. It does this by placing each data point into the group with the nearest center (centroid), and then adjusting the centers to improve the fit. The goal is to make sure that items in the same group are close to the center and each other.
+
+#### Finding the Best Number of Clusters
+
+We used the *elbow method* to determine an appropriate number of clusters (K). The algorithm was run for K = 2 to 10, and for each value of K, we computed the within-*cluster sum of squares (WSS)* — a measure of how tightly samples are grouped. The "elbow point" on the WSS curve suggests the best trade-off between model complexity and clustering performance.
+
+
+```{r}
+
+# Elbow method for K-means
+withinss_values <- c()
+for (k in 2:10) {
+  kmeans_result <- kmeans(ranked_sample_matrix, centers = k, nstart = 10)
+  withinss_values <- c(withinss_values, kmeans_result$tot.withinss)
+}
+
+plot_data <- data.frame(num_clusters = 2:10, wss = withinss_values)
+
+ggplot(plot_data, aes(x = num_clusters, y = wss)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Number of Clusters", y = "Within-Cluster Sum of Squares (WSS)") +
+  theme_minimal()
+
+```
+
+This elbow plot is used to determine the optimal number of clusters (K) for K-means clustering.
+    The Within-Cluster Sum of Squares (WSS) decreases with increasing K, as expected.
+    A noticeable "elbow" appears at *K = 4*, where the rate of WSS improvement begins to slow.
+    This suggests that *4 clusters* is a good balance between model complexity and separation — used as the basis for final clustering in the next step.
+
+
+#### Comparing Clusters to Clinical Data
+
+Once we chose a value for K, we ran K-means again to group the samples.
+We then compared the group assignments with a known clinical variable (vital_status) using a cross-tabulation table.
+
+```{r}
+# K-Means Clustering vs. Clinical Variable
+
+# Use K = 4 clusters (based on elbow plot or prior knowledge)
+kmeans_final <- kmeans(t(rna_expression_matrix), centers = 4)
+cluster_assignments <- kmeans_final$cluster
+
+# Compare cluster assignments with clinical variable (e.g., vital_status)
+comparison_table <- table(cluster_assignments, ddsSE$vital_status)
+comparison_table
+
+```
+
+This output compares the unsupervised K-means clusters (K = 4) to the known clinical variable vital status (Alive vs Dead).
+    *Cluster 2* is the largest and contains a slightly higher number of "Alive" patients (128 Alive vs 98 Dead).
+    *Cluster 1* is the smallest, with 14 Alive vs 8 Dead — possibly indicating a distinct group.
+    **Clusters 3 and 4* are also moderately sized and show slight enrichment for "Alive" samples.
+    Although the clusters were computed without using any clinical labels, some mild separation by outcome is observed — hinting at biological relevance of the clusters.
+
+## Supervised Analysis
+
+Supervised analysis is a machine learning approach where models are trained using an input dataset along with known labels (outcomes) associated with those data points.  
+During training, the model learns the relationship between the input features and their labels by iteratively adjusting its internal parameters to minimize the error between its predictions and the true labels.  
+After training, the model is used to predict the classification or outcome of new, unseen data.
+
+For gene expression data, machine learning models can serve various purposes.  
+For example, they can predict clinical phenotypes based on gene expression profiles, such as estimating a patient’s response to a particular treatment or predicting disease severity and its progression over time.
+
+---
+
+### Steps for LUAD Gene Expression Data
+
+**1. Data Preparation**  
+We first prepare the normalized gene expression data for use in model training and testing.  
+We set a random seed to make the results reproducible.  
+We extract the normalized count data from the differential expression analysis object (e.g., `dgeObj`).  
+We rank the genes by their *p*-values from the differential expression analysis, keeping only the significantly differentially expressed genes for machine learning.  
+This filtering is important because non-differentially expressed genes show little variation and are poor predictors for sample classification.
+
+**2. Reshape the Data**  
+Because machine learning models work by classifying samples based on their features (here, genes), we transpose the count matrix so that samples are in the rows and genes are in the columns.
+
+**3. Split Into Training and Test Sets**  
+We divide the dataset into ~70% for training and ~30% for testing.  
+We check that the proportion of outcome classes (e.g., “dead” vs. “alive”) is preserved in both sets to avoid class imbalance, ensuring that no group is over- or under-represented, which helps build more accurate and robust models.
+
+**4. Cross-Validation**  
+We set up **10-fold cross-validation** to evaluate model performance reliably.  
+In this setup, the training data is divided into 10 parts (“folds”); in each iteration, one fold is used as validation while the other nine are used for training.  
+The model is repeatedly trained and evaluated on different combinations of folds.  
+We configure this setup using the `trainControl()` function from the `caret` package.
+
+```{r}
+# Set seed for reproducibility
+set.seed(42)
+
+# Parameters
+top_n_genes <- 100  # Change based on the computational viability
+train_frac <- 0.7
+
+# Data preparation
+rna_data <- data.frame(dgeObj$counts)
+filtered_results_ord <- filtered_results$table[order(filtered_results$table$PValue), ]
+de_genes <- rownames(head(filtered_results_ord, top_n_genes))
+
+# Create combined dataset 
+rna_data_vital_status <- data.frame(
+  vital = factor(expression_filtered$vital_status), 
+  t(rna_data)[, de_genes, drop = FALSE]
+)
+
+# Ensure valid factor levels for modeling
+levels(rna_data_vital_status$vital) <- make.names(levels(rna_data_vital_status$vital))
+
+# Data validation
+stopifnot(!any(is.na(rna_data_vital_status)))
+stopifnot(all(de_genes %in% colnames(rna_data_vital_status)))
+
+# Split data
+train_idx <- createDataPartition(rna_data_vital_status$vital, p = train_frac, list = FALSE)
+train_set <- rna_data_vital_status[train_idx, ]
+test_set <- rna_data_vital_status[-train_idx, ]
+
+# Check dimensions of the splits
+cat("Training set dimensions:", dim(train_set), "\n")
+cat("Test set dimensions:", dim(test_set), "\n")
+
+# Check class balance
+cat("\nClass proportions:\n")
+cat("- Full dataset:\n")
+print(prop.table(table(rna_data_vital_status$vital)))
+cat("\n- Training set:\n")
+print(prop.table(table(train_set$vital)))
+cat("\n- Test set:\n")
+print(prop.table(table(test_set$vital)))
+```
+
+```{r}
+# Create 10 cross-validation folds, stratified by class
+folds <- createFolds(train_set$vital, k = 10, list = TRUE)
+
+# Set up training control with correct fold indices
+cv_control <- trainControl(
+  method = "cv",
+  number = 10,
+  index = folds,
+  savePredictions = "final",
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,  # Add if doing binary classification
+  verboseIter = TRUE  # Recommended to see progress
+)
+```
+
+```{r}
+# List of models to compare with tuning parameters
+models <- list(
+  rf = list(method = "rf", tuneLength = 5),
+  svmRadial = list(method = "svmRadial", tuneLength = 5),
+  glm = list(method = "glm"),
+  knn = list(method = "knn", tuneLength = 10)
+)
+
+# Store results
+model_list <- list()
+
+# Train each model
+for (m in names(models)) {
+  set.seed(42)
+  cat("Training:", m, "\n")
+  
+  # Create specific arguments list
+  args <- list(
+    x = train_set[, -which(names(train_set) == "vital")],  # predictors
+    y = train_set$vital,                                  # outcome
+    method = models[[m]]$method,
+    trControl = cv_control,
+    preProcess = c("center", "scale")
+  )
+  
+  # Add model-specific arguments
+  if (!is.null(models[[m]]$tuneLength)) {
+    args$tuneLength <- models[[m]]$tuneLength
+  }
+  if (m == "glm") {
+    args$family <- binomial()  # Note: binomial() function, not string
+  }
+  
+  model_list[[m]] <- do.call(train, args)
+}
+
+```
+
+```{r}
+# Compare models
+resamps <- resamples(model_list)
+
+# Summary metrics
+summary(resamps)
+
+# Visual comparison
+dotplot(resamps, metric = "ROC")  # Or "Accuracy"/other metrics
+
+# Identify best model (based on ROC)
+perf_metrics <- sapply(model_list, function(x) max(x$results$ROC, na.rm = TRUE))
+best_model_name <- names(which.max(perf_metrics))
+best_model <- model_list[[best_model_name]]
+
+cat("\nBest model is:", best_model_name, "with ROC of", max(perf_metrics), "\n")
+
+# Evaluate on test set
+test_pred <- predict(best_model, newdata = test_set)  # Consistent naming
+conf_mat <- confusionMatrix(test_pred, test_set$vital, positive = levels(test_set$vital)[2])
+print(conf_mat)
+
+# ROC analysis
+if(nlevels(test_set$vital) == 2) {  # Only for binary classification
+  test_prob <- predict(best_model, newdata = test_set, type = "prob")[, 2]
+  roc_obj <- roc(response = test_set$vital, predictor = test_prob)
+  plot(roc_obj, print.auc = TRUE)
+  cat("AUC on test set:", auc(roc_obj), "\n")
+}
+
+```
+
+
+## Bibliography
 
 1. Myers DJ, Wallen JM. Lung Adenocarcinoma. 2023 Jun 12. In: StatPearls [Internet]. Treasure Island (FL): StatPearls Publishing; 2025 Jan–. PMID: 30137862.
 2. Cancer Treatment Centers of America. (n.d.). Adenocarcinoma of the lung. Cancer Treatment Centers of America. https://www.cancercenter.com/cancer-types/lung-cancer/types/adenocarcinoma-of-the-lung
