@@ -76,7 +76,8 @@ This section presents all the packages used in this work, which support data acq
 #   "rsample",
 #   "caret",
 #   "uwot",
-#   "pROC"
+#   "pROC",
+#   "dendextend"
 # )
 
 # Install missing CRAN packages
@@ -117,6 +118,8 @@ library(rpart)
 library(rsample)
 library(caret)
 library(pROC)
+library(dendextend)
+
 ```
 
 ### Data Query and Preparation
@@ -1364,10 +1367,11 @@ UMAP projections revealed more defined structures compared to PCA and t-SNE, wit
 
 Clustering is a type of unsupervised machine learning that finds hidden patterns in data by grouping similar items together. It uses distance or similarity measurements to form groups (clusters) so that items in the same group are as similar as possible, and items in different groups are as different as possible.
 In this analysis, we used two main clustering methods:
-**1. Hierarchical Clustering**: builds a tree-like diagram (dendrogram) by repeatedly joining the closest items or groups without needing to set the number of clusters in advance.
-**2. K-means Clustering**: splits the data into a fixed number (K) of groups by minimizing the distances between items and the center (centroid) of their group.
+*1. Hierarchical Clustering*: builds a tree-like diagram (dendrogram) by repeatedly joining the closest items or groups without needing to set the number of clusters in advance.
+*2. K-means Clustering*: splits the data into a fixed number (K) of groups by minimizing the distances between items and the center (centroid) of their group.
 
 Before clustering, we converted the normalized gene expression data into a matrix format. Since the clustering methods need numerical matrices, this step ensures that the data can be processed. For sample-based analysis, we also transposed the matrix so that samples are in the rows and genes are in the columns.
+
 
 ```{r}
 # Normalize RNA-seq data using DESeq
@@ -1379,32 +1383,32 @@ rna_expression_transposed <- t(rna_expression_matrix)
 ### 1. Hierarchical Clustering
 
 Hierarchical clustering follows a bottom-up approach. It starts with each item as its own cluster and then gradually combines the closest clusters until all items are in a single group.
-We use **Euclidean distance** to measure how similar two profiles are. This is a standard way of measuring straight-line distance between points in multi-dimensional space.
+We use *Euclidean distance* to measure how similar two profiles are. This is a standard way of measuring straight-line distance between points in multi-dimensional space.
+
 
 
 ```{r}
-# Perform statistical test on each gene
-ttest_results_genes <- rowttests(t(rna_expression_matrix))
-gene_pvalue_ranking <- order(ttest_results_genes$p.value)
+# Select top 30 most variable genes (unsupervised)
+gene_variances <- apply(rna_expression_matrix, 1, var)
+top_gene_indices <- order(gene_variances, decreasing = TRUE)[1:30]
+ranked_gene_matrix <- rna_expression_matrix[top_gene_indices, ]
 
-# Select top 30 genes with lowest p-values
-top_gene_indices <- gene_pvalue_ranking[1:30]
-ranked_gene_matrix <- rna_expression_matrix[top_gene_indices,]
-
-# Calculate Euclidean distance
+# Compute Euclidean distance
 euclidean_dist_genes <- dist(ranked_gene_matrix)
+
 
 ```
 
 #### Gene Clustering
 
-We selected the top **30** most differentially expressed genes by choosing those with the smallest p-values from a statistical test.
-We calculated the Euclidean distance between the expression profiles of these genes across all samples.
-We used three different methods to build the dendrograms:
-    Single linkage: joins clusters based on the smallest distance between any two points;
-    Complete linkage: joins clusters based on the largest distance between points;
-    Average linkage: joins clusters based on the average distance between all points.
-This allowed us to explore how genes group together based on similar expression patterns.
+To investigate patterns of co-expression among genes, we performed hierarchical clustering on a subset of genes selected in an unsupervised manner.
+We selected the top 30 most variable genes across all samples by ranking genes according to their expression variance. This approach emphasizes genes with the greatest natural variation — a key strategy in unsupervised analysis — and avoids introducing bias from predefined clinical or biological labels.
+We then computed the *Euclidean distance* between the expression profiles of these genes and applied three different hierarchical clustering methods to explore how genes group based on similar expression patterns:
+  *Single linkage*: clusters are joined based on the smallest distance between any two points.
+  *Complete linkage*: uses the largest distance between points in different clusters.
+  *Average linkage*: uses the average distance between all points in two clusters.
+This comparison helps assess the stability and structure of the gene groupings under different assumptions of similarity.
+
 
 
 ```{r}
@@ -1412,78 +1416,116 @@ This allowed us to explore how genes group together based on similar expression 
 # Complete linkage
 cluster_complete <- hclust(euclidean_dist_genes)
 plot(cluster_complete, xlab = "", ylab = "Distance", 
-     main = "Dendrogram of Top 30 Differentially Expressed Genes\nMethod: Complete Linkage, Euclidean Distance")
+     main = "Dendrogram of Top 30 Most Variable Genes\nMethod: Complete Linkage")
 
 # Single linkage
 cluster_single <- hclust(euclidean_dist_genes, method = "single")
 plot(cluster_single, xlab = "", ylab = "Distance", 
-     main = "Dendrogram of Top 30 Differentially Expressed Genes\nMethod: Single Linkage, Euclidean Distance")
+     main = "Dendrogram of Top 30 Most Variable Genes\nMethod: Single Linkage")
 
 # Average linkage
 cluster_average <- hclust(euclidean_dist_genes, method = "average")
 plot(cluster_average, xlab = "", ylab = "Distance", 
-     main = "Dendrogram of Top 30 Differentially Expressed Genes\nMethod: Average Linkage, Euclidean Distance")
+     main = "Dendrogram of Top 30 Most Variable Genes\nMethod: Average Linkage")
 
-# Heatmap of the top 30 genes
-# Limit to the 30 most variable genes  
-gene_vars <- apply(rna_expression_matrix, 1, var)
-top_genes <- names(sort(gene_vars, decreasing = TRUE))[1:30]
+# Heatmap to visualize expression patterns
+heatmap(ranked_gene_matrix, labCol = FALSE)
 
-# Subset of the matrix with top genes
-heatmap_matrix <- rna_expression_matrix[top_genes, ]
-
-# Heatmap with scaling and without column labels (lighter)
-heatmap(heatmap_matrix, scale = "row", labCol = FALSE)
 
 ```
 
-The **average linkage dendrogram** offers the clearest clustering structure among the three, making it the best candidate for further biological interpretation.
-  The **heatmap** complements the dendrograms and clearly displays expression patterns, which can help identify gene signatures or sample subtypes.
+This panel displays three dendrograms (for single, complete, and average linkage) alongside a heatmap of the top 30 most variable genes across samples.
+    The dendrograms illustrate how genes group together based on expression similarity, depending on the linkage strategy.
+    The average linkage dendrogram appears to produce the most coherent and interpretable clusters, balancing both local and global structure.
+    The heatmap visualizes expression values across samples: darker colors indicate lower expression, while lighter colors suggest higher expression.
+    We observe that some genes cluster together with very similar expression profiles across samples, suggesting potential co-regulation or functional relationships.
+
 
 #### Sample Clustering
 
-We also applied hierarchical clustering to samples (patients).
-In this case, the matrix was transposed, and distances were calculated between samples using the selected genes.
-The same linkage methods (single, complete, average) were used to compare how patients cluster.
-We also created heatmaps to visualize expression patterns and support the dendrogram results.
+To explore patterns among samples (patients), we applied *hierarchical clustering* using the same top 30 most variable genes selected previously. These genes were chosen without reference to any clinical labels to ensure the clustering reflects *intrinsic transcriptomic structure*.
+We transposed the matrix so that each *row represents a patient* and *each column represents a gene*, then calculated Euclidean distances between sample profiles. Three clustering methods were applied (single, complete, average linkage), and results were visualized with dendrograms and a heatmap.
+
 
 ```{r}
 # Sample-Based Clustering (Hierarchical)
 
-# Use transposed matrix to focus on samples
-ttest_results_samples <- rowttests(t(rna_expression_matrix))
-sample_pvalue_ranking <- order(ttest_results_samples$p.value)
-top_sample_indices <- sample_pvalue_ranking[1:30]
-
-ranked_sample_matrix <- rna_expression_transposed[top_sample_indices,]
+# Transpose the ranked gene matrix: rows = samples, columns = genes
+ranked_sample_matrix <- t(ranked_gene_matrix)
 euclidean_dist_samples <- dist(ranked_sample_matrix)
 
 # Complete linkage
 sample_cluster_complete <- hclust(euclidean_dist_samples)
 plot(sample_cluster_complete, xlab = "", ylab = "Distance", 
-     main = "Dendrogram of Top 30 Samples\nMethod: Complete Linkage, Euclidean Distance")
+     main = "Dendrogram of Samples\nMethod: Complete Linkage, Euclidean Distance")
 
 # Single linkage
 sample_cluster_single <- hclust(euclidean_dist_samples, method = "single")
 plot(sample_cluster_single, xlab = "", ylab = "Distance", 
-     main = "Dendrogram of Top 30 Samples\nMethod: Single Linkage, Euclidean Distance")
+     main = "Dendrogram of Samples\nMethod: Single Linkage, Euclidean Distance")
 
 # Average linkage
 sample_cluster_average <- hclust(euclidean_dist_samples, method = "average")
 plot(sample_cluster_average, xlab = "", ylab = "Distance", 
-     main = "Dendrogram of Top 30 Samples\nMethod: Average Linkage, Euclidean Distance")
+     main = "Dendrogram of Samples\nMethod: Average Linkage, Euclidean Distance")
 
-# Heatmap of the samples
+# Heatmap of samples
 heatmap(ranked_sample_matrix,
         scale = "row",                   # Normalize each gene across samples
         labCol = FALSE,
-        col = colorRampPalette(c("blue", "white", "red"))(100))  # More expressive colors
+        col = colorRampPalette(c("blue", "white", "red"))(100))
+
+
 
 ```
 
-For nearly every gene, the expression values in most samples are below average.
-There may be very little variation within our selected top 30 samples.
+This plot shows hierarchical clustering applied to samples (patients) based on the same top 30 most variable genes.
+    Samples are arranged in a dendrogram, and gene expression is shown using a color-coded row-scaled heatmap (blue = low expression, red = high expression).
+    Some subclusters of patients exhibit coherent expression profiles across multiple genes, indicating potential biological subtypes.
+    However, overall structure is moderately diffuse, reflecting heterogeneity within the cohort — consistent with earlier observations that clinical variables do not align clearly with expression variation.
 
+
+To evaluate potential clinical relevance of sample groupings, we color-coded the hierarchical clustering dendrogram by *vital status* (Alive vs Dead).
+
+```{r}
+plot(sample_cluster_average,
+     main = "Dendrogram of Samples (Average Linkage)",
+     xlab = "", ylab = "Distance",
+     cex = 0.5,     # reduce label size
+     las = 2)       # rotate labels
+
+```
+```{r}
+# Extract clinical variable (ensure it's aligned with sample order)
+vital_status <- as.character(colData(ddsSE)$vital_status)
+names(vital_status) <- colnames(ranked_gene_matrix)  # assign sample names
+
+# Map Alive to green, Dead to red
+status_colors <- ifelse(vital_status == "Alive", "forestgreen", "firebrick")
+
+# Convert to dendrogram object
+dend <- as.dendrogram(sample_cluster_average)
+
+# Add colored labels
+labels_colors(dend) <- status_colors[order.dendrogram(dend)]
+
+# Plot with legend
+plot(dend, main = "Sample Dendrogram Colored by Vital Status")
+legend("topright", legend = c("Alive", "Dead"),
+       fill = c("forestgreen", "firebrick"),
+       border = NA, bty = "n")
+dend <- color_labels(dend, col = status_colors[order.dendrogram(dend)])
+dend <- color_branches(dend, k = 4)  # Cut tree into 4 groups if desired
+plot(dend, main = "Sample Dendrogram with Colored Branches and Labels")
+
+
+
+```
+
+In the *first version*, we retained default branch coloring and used only label colors and a legend for a cleaner visual presentation.
+  In the *second version*, branches were colored to distinguish structural clusters, and labels were colored by clinical outcome. This made it easier to visually identify whether clinical variables correspond to any expression-driven groupings.
+
+While the clusters were defined using unsupervised transcriptomic features, some branch-level enrichment for survival status is apparent. This suggests that transcriptomic variation may partially reflect clinical outcome.
 
 ### 2. K-means Clustering
 
@@ -1491,17 +1533,15 @@ K-means is a clustering algorithm that divides data into a set number (K) of gro
 
 #### Finding the Best Number of Clusters
 
-We used the **elbow method** to find the best number of clusters.
-The algorithm was run for K = 2 to K = 10.
-For each K, we calculated the within-cluster sum of squares (WSS) — a measure of how tightly packed the points are inside each cluster.
-We then plotted WSS vs. K to find the “elbow” point — the spot where increasing K doesn’t improve the result much. This is often a good choice for the number of clusters.
+We used the *elbow method* to determine an appropriate number of clusters (K). The algorithm was run for K = 2 to 10, and for each value of K, we computed the within-*cluster sum of squares (WSS)* — a measure of how tightly samples are grouped. The "elbow point" on the WSS curve suggests the best trade-off between model complexity and clustering performance.
+
 
 ```{r}
 
-# Determine optimal number of clusters using the elbow method
+# Elbow method for K-means
 withinss_values <- c()
 for (k in 2:10) {
-  kmeans_result <- kmeans(t(rna_expression_matrix), centers = k, nstart = 10)
+  kmeans_result <- kmeans(ranked_sample_matrix, centers = k, nstart = 10)
   withinss_values <- c(withinss_values, kmeans_result$tot.withinss)
 }
 
@@ -1512,18 +1552,20 @@ ggplot(plot_data, aes(x = num_clusters, y = wss)) +
   geom_point() +
   labs(x = "Number of Clusters", y = "Within-Cluster Sum of Squares (WSS)") +
   theme_minimal()
+
 ```
 
-The WSS decreases as K increases — which is expected, since more clusters naturally reduce the within-group variability.
-However, the rate of improvement slows down after a certain point.
-From visual inspection:
-  There’s a noticeable inflection point around K = 4.
-  Beyond that, the WSS reduction is more gradual — suggesting diminishing returns.
+This elbow plot is used to determine the optimal number of clusters (K) for K-means clustering.
+    The Within-Cluster Sum of Squares (WSS) decreases with increasing K, as expected.
+    A noticeable "elbow" appears at *K = 4*, where the rate of WSS improvement begins to slow.
+    This suggests that *4 clusters* is a good balance between model complexity and separation — used as the basis for final clustering in the next step.
+
 
 #### Comparing Clusters to Clinical Data
 
 Once we chose a value for K, we ran K-means again to group the samples.
 We then compared the group assignments with a known clinical variable (vital_status) using a cross-tabulation table.
+
 ```{r}
 # K-Means Clustering vs. Clinical Variable
 
@@ -1537,12 +1579,11 @@ comparison_table
 
 ```
 
-This helped us see whether the clusters based on gene expression align with known patient outcomes, possibly revealing meaningful biological differences.
-
-**Cluster 1**: The largest cluster — contains 223 patients with a nearly balanced but still slightly higher number of Alive (128 vs 95). This might represent a core group with average expression profiles.
-**Cluster 2**: Shows 23 Alive vs 14 Dead, suggesting a slightly more favorable survival group.
-**Cluster 3**: The smallest cluster — only 22 samples, but fairly balanced (8 vs 14).
-**Cluster 4**: Also small, with 26 Alive vs 15 Dead — again, mildly enriched for Alive.
+This output compares the unsupervised K-means clusters (K = 4) to the known clinical variable vital status (Alive vs Dead).
+    *Cluster 2* is the largest and contains a slightly higher number of "Alive" patients (128 Alive vs 98 Dead).
+    *Cluster 1* is the smallest, with 14 Alive vs 8 Dead — possibly indicating a distinct group.
+    **Clusters 3 and 4* are also moderately sized and show slight enrichment for "Alive" samples.
+    Although the clusters were computed without using any clinical labels, some mild separation by outcome is observed — hinting at biological relevance of the clusters.
 
 ## Supervised Analysis
 
