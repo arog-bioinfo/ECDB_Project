@@ -138,8 +138,8 @@ The **`GDCdownload()`** function is then used to download the data according to 
 # Define the base directory
 
 # base_dir <- "/Users/mariacarvalho/Desktop/Mestrado/2º\ semestre/Extração"  # Change this to your desired path
-# base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
-base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"
+base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
+# base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"
 
 
 # Create directory if it doesn't exist
@@ -169,7 +169,7 @@ if (!file.exists(rna_seq_file)) {
     save.filename = rna_seq_file,
     directory = gdc_data
   )
-
+  rm(query_LUAD)
 } else {
   rna_seq_LUAD <- get(load(rna_seq_file))
   rm(data)
@@ -217,47 +217,48 @@ The comprehensive nature of the TCGA-LUAD dataset supports efforts in understand
 
 ## Data Pre-Processing {.tabset}
 
-In this stage, we preprocess the dataset to ensure its quality for differential expression and enrichment analysis. First, we separate the gene expression data from the metadata, structuring the dataset for efficient analysis. Then, we apply filtering techniques to remove noise, retaining only biologically relevant information that will enhance the accuracy of downstream analyses.
+In this stage, we preprocess the dataset to ensure its quality for differential expression and enrichment analysis. First, we separate the gene expression data from the metadata, structuring the dataset for efficient analysis.
 
 
 ```{r}
 # Extract gene expression matrix
-expression_data <- as.data.frame(assay(rna_seq_LUAD))
-expression_filtered <- expression_data[rowSums(expression_data > 1) > (0.5 * ncol(expression_data)), ]
-
+geneExp <- SummarizedExperiment::assay(rna_seq_LUAD, "unstranded")
 
 # Extract clinical metadata
-clinical_data <- colData(rna_seq_LUAD)
+metadata_col = SummarizedExperiment::colData(rna_seq_LUAD)
 
+# Gene Annotations
+metadata_row = SummarizedExperiment::rowData(rna_seq_LUAD)
+rm(rna_seq_LUAD)
 ```
 
 ### Initial Data Exploration
 
 ```{r}
-cat("Dimensions:", dim(rna_seq_LUAD)[1], "genes x", dim(rna_seq_LUAD)[2], "samples\n")
+cat("Dimensions:", dim(geneExp)[1], "genes x", dim(geneExp)[2], "samples\n")
 
 # Summaries
-summary(expression_filtered[1:5, 1:5])  
-summary(clinical_data)
+summary(geneExp[1:5, 1:5])  
+summary(metadata_col)
+summary(metadata_row)
 
-cat("Genes:", nrow(expression_filtered), "\n")
-cat("Samples:", ncol(expression_filtered), "\n")
+cat("Genes:", nrow(geneExp), "\n")
+cat("Samples:", ncol(geneExp), "\n")
 
 # Gene-wise statistics
 gene_stats <- data.frame(
-  Mean = rowMeans(expression_filtered),
-  SD = apply(expression_filtered, 1, sd)
+  Mean = rowMeans(geneExp),
+  SD = apply(geneExp, 1, sd)
 )
 summary(gene_stats)
+rm(gene_stats)
 ```
 
 #### Gene and Sample Metadata
 
 ```{r}
-gene_metadata <- rowData(rna_seq_LUAD)
-sample_metadata <- colData(rna_seq_LUAD)
-cat("Gene metadata:", dim(gene_metadata), "\n")
-cat("Sample metadata:", dim(sample_metadata), "\n")
+cat("Gene metadata:", dim(metadata_row), "\n")
+cat("Sample metadata:", dim(metadata_col), "\n")
 ```
 
 ### Missing Values (NA)
@@ -265,32 +266,35 @@ cat("Sample metadata:", dim(sample_metadata), "\n")
 We analyze missing values in the dataset to identify patterns, assess their impact, and determine the best approach for handling them, ensuring data integrity for further analysis.
 
 ```{r}
-# For expression_data (gene expression matrix)
-percent_missing_expression = colSums(is.na(expression_data)) / nrow(expression_data) * 100
+# For geneExp (gene expression matrix)
+percent_missing_expression = colSums(is.na(geneExp)) / nrow(geneExp) * 100
 
-# For clinical_data (clinical_data)
-percent_missing_clinical = colSums(is.na(clinical_data)) / nrow(clinical_data) * 100
+# For metadata_col (clinical data)
+percent_missing_clinical = colSums(is.na(metadata_col)) / nrow(metadata_col) * 100
 
-unique(percent_missing_expression) #Output tem que ser melhor.
-percent_missing_clinical
+cat("Unique % missing expression values per sample:", unique(percent_missing_expression), "\n")
+
+df <- data.frame(variable = names(metadata_col),
+                 missing = percent_missing_clinical)
+
+ggplot(df, aes(x = reorder(variable, -missing), y = missing)) +
+  geom_segment(aes(xend = variable, yend = 0), color = "grey") +
+  geom_point(color = "tomato", size = 2) +
+  coord_flip() +
+  labs(title = "Missing Clinical Data per Variable",
+       x = "Variable", y = "% Missing") +
+    theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+
+rm(df,percent_missing_expression)
 ```
-There were no NAs for the `gene expression matrix`. In the `clinical_data` some values are missing (NA). We need to remove or impute these values to avoid bias.
-
-```{r}
-columns_with_na = names(clinical_data)[colSums(is.na(clinical_data)) > 0]
-
-# Variables with NAs
-print(columns_with_na)
-
-```
+There were no NAs for the `gene expression matrix`. In the `clinical_data` some values are missing (NA).
 
 A table was created listing the variables and their corresponding missing values (NAs) to help identify which variables were selected for this analysis.
 
 ```{r}
-tabela_nas = data.frame(Variável = names(clinical_data), 
-                         Total_NAs = colSums(is.na(clinical_data)))
-
-print(tabela_nas)
+data.frame(Variável = names(metadata_col), 
+                         Total_NAs = colSums(is.na(metadata_col)))
 ```
 
 As a general rule in data preprocessing, variables with a high proportion of missing values can introduce bias or reduce the power of statistical analyses. Therefore, we chose to exclude variables with more than 30% missing values. This threshold strikes a balance between preserving as much data as possible while ensuring that the retained variables are informative and complete enough for meaningful analysis.
@@ -302,11 +306,8 @@ By applying this filter, we focused the dataset on the most relevant and reliabl
 threshold = 30  # in percent
 
 # For clinical data
-clinical_data_filtered = clinical_data[, percent_missing_clinical <= threshold]
-
-columns_with_no_na <- names(clinical_data_filtered)[colSums(is.na(clinical_data_filtered)) == 0]
-
-columns_with_no_na
+clinical_data_filtered = metadata_col[, percent_missing_clinical <= threshold]
+rm(percent_missing_clinical, threshold)
 ```
 
 ## Univariate Statistical Analysis
@@ -316,8 +317,7 @@ After filtering the variables, we selected the following as our feature variable
   
 ```{r}
 # GENDER
-
-barplot(table(clinical_data_filtered@listData[["gender"]]), 
+barplot(table(clinical_data_filtered$gender), 
         main = "Distribution of Gender", 
         xlab = "Gender", 
         ylab = "Count", 
@@ -329,11 +329,7 @@ barplot(table(clinical_data_filtered@listData[["gender"]]),
   `race`: Self-reported racial background of the patient (Asian, American indian or Alaska native, Black or African American, White, Not Reported, Unknown --> Categorical Variable). May reflect epidemiological or socio-demographic patterns.
 ```{r}
 # RACE
-
-race_data <- clinical_data_filtered@listData[["race"]]
-race_table <- table(race_data)
-
-
+race_table <- table(clinical_data_filtered$race)
 race_percent <- prop.table(race_table) * 100
 
 race_df <- data.frame(
@@ -343,9 +339,7 @@ race_df <- data.frame(
 )
 
 print(race_df)
-
-
-
+rm(race_table, race_percent, race_df)
 ```
   Since the majority of patients are White (77.7%) or Black/African American (9.8%), and all other racial groups represent less than 2% each, we chose to focus our analysis on these two groups to ensure statistical relevance and interpretability.
   
@@ -380,10 +374,10 @@ hist(clinical_data_filtered$age_at_diagnosis,
 `primary_diagnosis`: Main clinical diagnosis assigned to the patient (Type of tumor --> Categorical Variable). Will help us understand if the type of the tumor will have influence in our response variable.
 
 ```{r}
-diagnosis_data <- clinical_data_filtered@listData[["primary_diagnosis"]]
+diagnosis_data <- clinical_data_filtered$primary_diagnosis
 diagnosis_table <- table(diagnosis_data)
-diagnosis_percent <- prop.table(diagnosis_table) * 100
-diagnosis_percent
+diagnosis_percent <- sort(prop.table(diagnosis_table) * 100, decreasing = TRUE)
+as.data.frame(diagnosis_percent) 
 ```
 Since the majority of cases are concentrated in Adenocarcinoma, NOS (56.19%) and Adenocarcinoma with mixed subtypes (14.48%), and the other tumor types each represent less than 1%, with the 'Not Reported' category also being excluded, we will focus our analysis on these two tumor types to ensure statistical relevance and improve the interpretability of the results.
 ```{r}
@@ -396,22 +390,17 @@ clinical_data_filtered <- clinical_data_filtered[
   clinical_data_filtered$primary_diagnosis != "Not Reported", ]
 
 table(clinical_data_filtered$primary_diagnosis)
+rm(diagnosis_data, diagnosis_table, diagnosis_percent)
 ```
 
 
 ```{r}
-
-# Set colors (1 per type)
-
-colors <- c("#6A0572", "#9D0191", "#FF6464", "#FFAB73", "#FFC93C", "#F9F871")
-
-
 # Plot
 # Example of a pie chart
 pie(
   table(clinical_data_filtered$primary_diagnosis),
   main = "Primary Diagnosis",
-  col = colors,
+  col = c("#6A0572", "#9D0191", "#FF6464", "#FFAB73", "#FFC93C", "#F9F871"),
   border = "white"
 )
 
@@ -479,7 +468,8 @@ clinical_df <- clinical_df %>%
     !is.na(gender),
     !is.na(vital_status),
     !is.na(ajcc_pathologic_stage),
-    ajcc_pathologic_stage != "Stage I"
+    ajcc_pathologic_stage != "Stage I",
+    !is.na(tissue_type)
   )
 
 # Reverse the order of levels
@@ -494,6 +484,7 @@ dead_prop <- clinical_df %>%
 # Reorder factor levels based on proportion
 clinical_df$primary_diagnosis <- factor(clinical_df$primary_diagnosis,
                                         levels = dead_prop$primary_diagnosis)
+rm(dead_prop)
 ```
 
 #### Vital Status by Primary Diagnosis
@@ -595,7 +586,6 @@ geom_bar(position = "fill") +
 geom_text(stat = "count", aes(label = ..count..), position = position_fill(vjust = 0.5), size = 3) +
 labs(title = "Vital Status by AJCC Pathologic Stage", y = "Proportion") +
 theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
 ```
 
 A clear trend emerges: earlier stages, such as Stage IA, show a higher proportion of patients alive (94 Alive vs 12 Dead), whereas advanced stages like Stage IIIB and Stage IV show a much higher proportion of deceased patients. For example, in Stage IIIB, only 6 patients are alive compared to 11 deceased — illustrating the sharp decline in survival as stage increases.
@@ -652,57 +642,112 @@ The plots show noticeable deviations from the diagonal line, particularly in the
 wilcox.test(age_at_diagnosis ~ vital_status, data = clinical_df)
 ```
 Since the p-value is much greater than 0.05, we fail to reject the null hypothesis, indicating that there is no statistically significant difference in age at diagnosis between patients who are alive and those who are deceased in this cohort.
+So for all the variables chosen for analysis, only AJCC Pathologic Stage show significance influence in survivability.
+```{r cleaning, echo=FALSE, results='hide'}
+gc()
+```
 
 ## Differential expression and enrichment analysis
 
 ### Differential expression analysis {.tabset}
 #### DESEQ2
 
+
 In order to analyze the genes that are differentially expressed in the tumor type **“Adenocarcinoma, NOS”** within **Lung Adenocarcinoma** (TCGA, GDC), based on the patients’ vital status, a data pre-processing step was performed to facilitate and optimize the differential expression analysis while reducing computational time and resource usage.
-
-
-```{r}
-clinical_df
-```
 
 Initially, samples with the primary diagnosis **“Adenocarcinoma, NOS”** were filtered, as only these samples are relevant to our study due to the higher incidence of this cancer subtype. 
 
 
 ```{r}
-diagnosis_table
-
-metadata_col = SummarizedExperiment::colData(rna_seq_LUAD)
-geneExp = SummarizedExperiment::assay(rna_seq_LUAD, "unstranded")
-filtered_data <- metadata_col[!is.na(metadata_col$primary_diagnosis) &
-                              metadata_col$primary_diagnosis == "Adenocarcinoma, NOS", ]
-ADC_data <- geneExp[, rownames(filtered_data)]
+# filtered_samples <- metadata_col[!is.na(metadata_col$primary_diagnosis) &
+#                               metadata_col$primary_diagnosis == "Adenocarcinoma, NOS", ]
+# ADC_data <- geneExp[, rownames(filtered_samples)]
+ADC_data <- geneExp[, rownames(clinical_df)]
 ```
 
-```{r}
-expression_filtered = metadata_col[!is.na(metadata_col$primary_diagnosis),]
-expression_filtered = expression_filtered[expression_filtered$primary_diagnosis=="Adenocarcinoma, NOS",]
-
-
-```
 After subsetting the dataset to include only samples with a primary diagnosis of "Adenocarcinoma, NOS", the gene expression matrix (ADC_data) contained **60,660 genes**. Since there were no missing values in the expression data, all annotated genes were initially retained. However, many of these genes either showed no expression or had consistently low expression across the samples, which can introduce noise in downstream analyses. To address this, an additional filtering step was applied to remove genes with zero counts across all samples, as well as those with fewer than 20 counts in fewer than 4 samples. These filtering criteria follow standard guidelines from the DESeq2 workflow, ensuring that only genes with sufficient expression are retained for meaningful differential expression analysis.
-
 
 Next, we checked for missing values in the **vital status** column. 
 
 ```{r}
-sum(is.na(expression_filtered$vital_status))
-expression_filtered$vital_status = factor(expression_filtered$vital_status)
+sum(is.na(clinical_df$vital_status))
+sum(is.na(clinical_df$tissue_status))
+clinical_df$vital_status = factor(clinical_df$vital_status)
+clinical_df$tissue_type = factor(clinical_df$tissue_type)
 ```
 Since no missing values were found, the “vital_status” metadata was converted into a factor, as the differential expression analysis using the **DESeq2** package recommends using factors instead of character variables.
 
 After the preprocessing steps, the final dataset included approximately **33,293 genes** and **323 samples**. With this filtered dataset, we created the **DESeqDataSet** object, using the “vital_status” factor as the explanatory variable in the model.
 This analysis used a significance threshold of α = 0.05 to identify genes differentially expressed between vital status groups.
+```{r}
+ddsSE = DESeqDataSetFromMatrix(countData = ADC_data, colData = clinical_df, design = ~tissue_type)
+
+ddsSE = ddsSE[rowSums(counts(ddsSE) >= 20) >= 4, ]
+dim(ddsSE)
+```
+```{r, message=FALSE, warning=FALSE}
+ddsSE_norm = DESeq(ddsSE)
+res = results(ddsSE_norm, alpha = 0.05)
+
+summary(res) # summary of differential expression test results
+```
+```{r}
+sum(res$padj < 0.05, na.rm=TRUE) # Total number of genes with differential expression
+```
 
 ```{r}
-ddsSE = DESeqDataSetFromMatrix(countData = ADC_data, colData = expression_filtered, design = ~vital_status)
+de_gene_count <- sum(res$padj < 0.05, na.rm = TRUE)
+print(de_gene_count)
+```
 
-keep_genes = rowSums(counts(ddsSE) >= 20) >= 4
-ddsSE = ddsSE[keep_genes, ]
+```{r}
+# Total number of tested genes
+total_genes <- sum(!is.na(res$padj))
+
+# Number of significantly differentially expressed genes (padj < 0.05)
+sig_genes <- sum(res$padj < 0.05, na.rm = TRUE)
+
+# Percentage of DE genes
+percent_DE <- round((sig_genes / total_genes) * 100, 2)
+
+# Among DE genes, count upregulated and downregulated
+upregulated <- sum(res$padj < 0.05 & res$log2FoldChange > 0, na.rm = TRUE)
+downregulated <- sum(res$padj < 0.05 & res$log2FoldChange < 0, na.rm = TRUE)
+
+```
+```{r, echo=FALSE}
+
+# Print results
+cat("Total tested genes:", total_genes, "\n")
+cat("Significantly DE genes:", sig_genes, "(", percent_DE, "% )\n")
+cat("Upregulated:", upregulated, "\n")
+cat("Downregulated:", downregulated, "\n")
+
+```
+
+```{r}
+#  graphical display of results
+DESeq2::plotMA(res, main="DESeq2 differential expression analysis")
+```
+```{r}
+plotCounts(ddsSE_norm, gene=which.min(res$padj), intgroup="tissue_type", pch = 19)
+
+
+resOrdered = res[order(res$padj),]
+resOrdered[1,]
+```
+```{r}
+#Removing from further analysis
+clinical_df <- clinical_df %>%
+  filter(tissue_type != "Normal")
+
+ADC_data <- geneExp[, rownames(clinical_df)]
+```
+
+```{r}
+ddsSE = DESeqDataSetFromMatrix(countData = ADC_data, colData = clinical_df, design = ~vital_status)
+
+ddsSE = ddsSE[rowSums(counts(ddsSE) >= 20) >= 4, ]
 dim(ddsSE)
 
 ```
@@ -766,7 +811,6 @@ Differential expression analysis using DESeq2 identified **5,994 genes** (approx
 
 ```{r}
 plotCounts(ddsSE_norm, gene=which.min(res$padj), intgroup="vital_status", pch = 19)
-plotCounts(ddsSE_norm, gene=which.min(res$padj), intgroup="vital_status", pch = 19)
 
 resOrdered = res[order(res$padj),]
 resOrdered[1,]
@@ -824,7 +868,7 @@ After creating the DGEList object dgeObj containing raw count data, normalizatio
 To perform a differential expression analysis, a design matrix is constructed to specify the experimental conditions. 
 ```{r}
 # Differential expression analysis
-vital_status = as.factor(expression_filtered$vital_status)
+vital_status = as.factor(filtered_samples$vital_status)
 design = model.matrix(~vital_status)
 ```
 Here, vital_status ("Alive" vs. "Dead") is extracted from the metadata and converted into a factor to indicate categorical grouping. The model.matrix() function then builds a design matrix based on this grouping, where the intercept represents one condition (the baseline), and the second column represents the contrast of interest. 
@@ -893,7 +937,7 @@ While the trend of downregulation in the "Dead" group still exists, the number o
 The goal of this section is to identify genes whose expression levels differ significantly between the two clinical conditions ("Alive" vs. "Dead") and prepare the results for downstream enrichment analysis. We use a generalized linear model (GLM) approach implemented in the edgeR package to perform this task.
 
 ```{r}
-vital_status = as.factor(expression_filtered$vital_status)
+vital_status = as.factor(filtered_samples$vital_status)
 design = model.matrix(~vital_status)
 
 dgeObj = estimateDisp(dgeObj, design = design)
@@ -1169,6 +1213,11 @@ pca_df$sample_id <- rownames(pca_df)
 clinical_df$sample_id <- rownames(clinical_df)
 pca_df_merged <- merge(pca_df, clinical_df, by = "sample_id")
 
+ggplot(pca_df_merged, aes(x = PC1, y = PC2, color = vital_status, shape = vital_status)) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  labs(title = "PCA: Vital Status", x = "PC1", y = "PC2") +
+  theme_minimal()
+
 #By Primary Diagnosis and Vital Status
 ggplot(pca_df_merged, aes(x = PC1, y = PC2, color = primary_diagnosis, shape = vital_status)) +
   geom_point(size = 2.5, alpha = 0.8) +
@@ -1264,6 +1313,11 @@ tsne_df_final <- cbind(tsne_df, clinical_df_filtered)
 Now, we visualize the t-SNE embeddings colored by clinical and demographic attributes:
 
 ```{r, message=FALSE, warning=FALSE}
+# t-SNE by Vital Status and Gender
+ggplot(tsne_df_final, aes(x = tSNE1, y = tSNE2, color = vital_status, shape = vital_status)) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(title = "t-SNE: Vital Status")
 
 # t-SNE by Vital Status and Gender
 ggplot(tsne_df_final, aes(x = tSNE1, y = tSNE2, color = gender, shape = vital_status)) +
@@ -1633,7 +1687,7 @@ de_genes <- rownames(head(filtered_results_ord, top_n_genes))
 
 # Create combined dataset 
 rna_data_vital_status <- data.frame(
-  vital = factor(expression_filtered$vital_status), 
+  vital = factor(filtered_samples$vital_status), 
   t(rna_data)[, de_genes, drop = FALSE]
 )
 
