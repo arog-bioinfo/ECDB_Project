@@ -98,6 +98,8 @@ This section presents all the packages used in this work, which support data acq
 After installing the required packages, we need to load them into our R environment. The following command ensures all libraries are available for analysis:
 
 ```{r,results='hide', warning = FALSE, message=FALSE}
+knitr::opts_chunk$set(warning = FALSE)
+
 library(BiocManager)
 library(jpeg)
 library(TCGAbiolinks)
@@ -896,7 +898,7 @@ To perform a differential expression analysis, a design matrix is constructed to
 
 ```{r}
 # Differential expression analysis
-vital_status = as.factor(filtered_samples$vital_status)
+vital_status = as.factor(clinical_df$vital_status)
 design = model.matrix(~vital_status)
 ```
 
@@ -1622,69 +1624,113 @@ For example, they can predict clinical phenotypes based on gene expression profi
 ### Steps for LUAD Gene Expression Data
 
 **1. Data Preparation**\
-We first prepare the normalized gene expression data for use in model training and testing.\
-We set a random seed to make the results reproducible.\
-We extract the normalized count data from the differential expression analysis object (e.g., `dgeObj`).\
-We rank the genes by their *p*-values from the differential expression analysis, keeping only the significantly differentially expressed genes for machine learning.\
-This filtering is important because non-differentially expressed genes show little variation and are poor predictors for sample classification.
+We begin by preparing the normalized gene expression data for use in machine learning models. A random seed is set to ensure reproducibility. The normalized count matrix is extracted from the differential expression analysis object (`dgeObj`), and genes are ranked by *p*-value. We retain only the top differentially expressed (DE) genes, as they are more likely to capture biologically relevant signals.This filtering step helps remove noisy, non-informative genes that may hinder model performance.
 
 **2. Reshape the Data**\
-Because machine learning models work by classifying samples based on their features (here, genes), we transpose the count matrix so that samples are in the rows and genes are in the columns.
+Machine learning algorithms operate on matrices where rows represent observations (samples) and columns represent features (genes). To conform to this format, we transpose the gene expression matrix so that each row corresponds to a patient sample, and each column corresponds to the expression level of a selected DE gene.
 
 **3. Split Into Training and Test Sets**\
-We divide the dataset into \~70% for training and \~30% for testing.\
-We check that the proportion of outcome classes (e.g., “dead” vs. “alive”) is preserved in both sets to avoid class imbalance, ensuring that no group is over- or under-represented, which helps build more accurate and robust models.
+The dataset is split into approximately 70% training and 30% testing. We use stratified partitioning to ensure that the class distribution (e.g., “Alive” vs. “Dead”) remains consistent across both sets. This prevents model bias caused by class imbalance and ensures that performance metrics reflect real-world classification challenges. 
 
-**4. Cross-Validation**\
-We set up **10-fold cross-validation** to evaluate model performance reliably.\
-In this setup, the training data is divided into 10 parts (“folds”); in each iteration, one fold is used as validation while the other nine are used for training.\
-The model is repeatedly trained and evaluated on different combinations of folds.\
-We configure this setup using the `trainControl()` function from the `caret` package.
+Since we only have 323 samples, we limited the number of input features to the **top 300 differentially expressed genes**. This helps prevent overfitting and ensures model training remains computationally efficient and statistically robust given the sample size.
 
 ```{r}
-# Set seed for reproducibility
-set.seed(42)
+set.seed(654321)
 
-# Parameters
-top_n_genes <- 100  # Change based on the computational viability
+# Step 1: Compute CPM from raw counts (for filtering only)
+cpm_raw <- cpm(ADC_data)
+
+# Step 2: Filter out low-expressed genes
+min_exp <- cpm_raw > 0.5
+keep_genes <- rowSums(min_exp) >= 2
+ADC_data_filt <- ADC_data[keep_genes, ]
+
+# Step 3: Create DGEList object from filtered raw counts
+dgeObj <- DGEList(ADC_data_filt)
+
+# Step 4: Normalize (TMM) and transform for ML
+dgeObj <- calcNormFactors(dgeObj)
+log_geneExp_filt <- cpm(dgeObj, log = TRUE)
+
+plot(density(as.vector(log_geneExp_filt)), 
+     main = "Density of All log2-CPM Values",
+     xlab = "log2-CPM")
+```
+
+```{r}
+#Parameters
+top_n_genes <- 300
 train_frac <- 0.7
 
-# Data preparation
-rna_data <- data.frame(dgeObj$counts)
-filtered_results_ord <- filtered_results$table[order(filtered_results$table$PValue), ]
-de_genes <- rownames(head(filtered_results_ord, top_n_genes))
+# Step 5: Load normalized matrix
+rna_data <- data.frame(log_geneExp_filt)
 
-# Create combined dataset 
+# Step 6: Transpose so rows = samples, cols = genes
+rna_data_t <- t(rna_data)
+
+# Step 7: Remove zero-variance genes (on columns)
+nzv <- nearZeroVar(rna_data_t, saveMetrics = TRUE)
+non_zero_var_genes <- colnames(rna_data_t)[nzv$nzv == FALSE]
+
+# Step 8: Now select DE genes from this subset
+filtered_results_ord <- filtered_results$table[order(filtered_results$table$PValue), ]
+filtered_results_ord <- filtered_results_ord[rownames(filtered_results_ord) %in% non_zero_var_genes, ]
+top_genes <- rownames(head(filtered_results_ord, top_n_genes))
+
+# Step 9: Build final expression matrix (samples x genes)
+expr_mat <- rna_data_t[, top_genes, drop = FALSE]
+
+# Step 10: Combine with clinical labels
 rna_data_vital_status <- data.frame(
-  vital = factor(filtered_samples$vital_status), 
-  t(rna_data)[, de_genes, drop = FALSE]
+  vital = factor(clinical_df$vital_status),
+  expr_mat
 )
 
-# Ensure valid factor levels for modeling
+# Step 11: Clean and split
 levels(rna_data_vital_status$vital) <- make.names(levels(rna_data_vital_status$vital))
 
-# Data validation
 stopifnot(!any(is.na(rna_data_vital_status)))
-stopifnot(all(de_genes %in% colnames(rna_data_vital_status)))
 
-# Split data
 train_idx <- createDataPartition(rna_data_vital_status$vital, p = train_frac, list = FALSE)
 train_set <- rna_data_vital_status[train_idx, ]
 test_set <- rna_data_vital_status[-train_idx, ]
 
-# Check dimensions of the splits
+# Report
 cat("Training set dimensions:", dim(train_set), "\n")
 cat("Test set dimensions:", dim(test_set), "\n")
-
-# Check class balance
-cat("\nClass proportions:\n")
 cat("- Full dataset:\n")
 print(prop.table(table(rna_data_vital_status$vital)))
-cat("\n- Training set:\n")
+cat("- Training set:\n")
 print(prop.table(table(train_set$vital)))
-cat("\n- Test set:\n")
+cat("- Test set:\n")
 print(prop.table(table(test_set$vital)))
+
 ```
+### 5. Model Simulation
+
+After preprocessing the gene expression data, we trained and evaluated multiple supervised machine learning models to classify patient survival status ("Alive" vs. "Dead") based on differential gene expression.
+
+We implemented five widely used classification algorithms:  
+- Random Forest (`rf`)  
+- Support Vector Machine with radial kernel (`svmRadial`)  
+- Generalized Linear Model (`glm`)  
+- Penalized logistic regression (`glmnet`)  
+- k-Nearest Neighbors (`knn`)  
+
+All models were trained using the `caret` package, with standardization (`center`, `scale`) applied during preprocessing.
+
+To ensure fair evaluation, we used **10-fold cross-validation** with SMOTE-based resampling to mitigate class imbalance during training.  
+Hyperparameters for each model were optimized internally using `tuneLength`.
+
+After training, models were evaluated on the **held-out test set** (~30% of the original samples), and performance was assessed using several metrics:  
+- **Accuracy**  
+- **Sensitivity and Specificity**  
+- **Balanced Accuracy**  
+- **Area Under the ROC Curve (AUC)**  
+
+In addition to individual model evaluation, we compared performance across models using ROC plots and selected the best-performing model based on a combination of AUC, accuracy, and balanced accuracy.  
+
+This simulation framework ensures reproducibility and reliable assessment of each model's ability to generalize to unseen data.
 
 ```{r}
 # Create 10 cross-validation folds, stratified by class
@@ -1698,16 +1744,19 @@ cv_control <- trainControl(
   savePredictions = "final",
   classProbs = TRUE,
   summaryFunction = twoClassSummary,  # Add if doing binary classification
-  verboseIter = TRUE  # Recommended to see progress
+  verboseIter = TRUE,  # Recommended to see progress
+  sampling = "smote"
 )
 ```
 
-```{r}
+
+```{r, echo=False, results=False}
 # List of models to compare with tuning parameters
 models <- list(
   rf = list(method = "rf", tuneLength = 5),
   svmRadial = list(method = "svmRadial", tuneLength = 5),
   glm = list(method = "glm"),
+  glmnet = list(method = "glmnet", tuneLength = 5),
   knn = list(method = "knn", tuneLength = 10)
 )
 
@@ -1716,30 +1765,94 @@ model_list <- list()
 
 # Train each model
 for (m in names(models)) {
-  set.seed(42)
   cat("Training:", m, "\n")
   
-  # Create specific arguments list
-  args <- list(
-    x = train_set[, -which(names(train_set) == "vital")],  # predictors
-    y = train_set$vital,                                  # outcome
-    method = models[[m]]$method,
-    trControl = cv_control,
-    preProcess = c("center", "scale")
+  if (m == "svmRadial") {
+    # formula interface to avoid probability prediction bug
+    model_list[[m]] <- train(
+      vital ~ .,                   
+      data = train_set,           
+      method = models[[m]]$method,
+      trControl = cv_control,
+      preProcess = c("center", "scale"),
+      tuneLength = models[[m]]$tuneLength,
+      metric = "ROC"
+    )
+  } else {
+    args <- list(
+      x = train_set[, -which(names(train_set) == "vital")],
+      y = train_set$vital,
+      method = models[[m]]$method,
+      trControl = cv_control,
+      preProcess = c("center", "scale")
+    )
+
+    # Add model-specific arguments
+    if (!is.null(models[[m]]$tuneLength)) {
+      args$tuneLength <- models[[m]]$tuneLength
+    }
+    if (m == "glm") {
+      args$family <- binomial()
+    }
+
+    model_list[[m]] <- do.call(train, args)
+  }
+}
+
+
+```
+```{r}
+select_best_model <- function(models, test_data, positive_class = "Alive") {
+  results <- lapply(models, function(model) {
+    # Try training ROC
+    roc_train <- tryCatch(max(model$results$ROC, na.rm = TRUE), error = function(e) NA)
+
+    # Predictions
+    pred <- tryCatch(predict(model, newdata = test_data), error = function(e) NA)
+    prob <- tryCatch(predict(model, newdata = test_data, type = "prob")[, 2], error = function(e) NA)
+
+    # Confusion Matrix
+    cm <- tryCatch(confusionMatrix(pred, test_data$vital, positive = positive_class), error = function(e) NULL)
+
+    # AUC
+    auc_test <- tryCatch(auc(roc(test_data$vital, prob)), error = function(e) NA)
+
+    # Extract metrics safely
+    acc <- if (!is.null(cm)) cm$overall["Accuracy"] else NA
+    sens <- if (!is.null(cm)) cm$byClass["Sensitivity"] else NA
+    spec <- if (!is.null(cm)) cm$byClass["Specificity"] else NA
+    bal_acc <- if (!is.null(cm)) cm$byClass["Balanced Accuracy"] else NA
+
+    c(
+      TrainROC    = roc_train,
+      TestAUC     = auc_test,
+      Accuracy    = acc,
+      Sensitivity = sens,
+      Specificity = spec,
+      BalancedAcc = bal_acc
+    )
+  })
+
+  # Compile results into a data frame
+  metrics_df <- as.data.frame(do.call(rbind, results))
+  rownames(metrics_df) <- names(models)
+
+  # Calculate a Composite Score — if all columns exist
+  composite_cols <- intersect(c("TestAUC", "BalancedAcc", "Accuracy"), colnames(metrics_df))
+  metrics_df$Composite <- rowMeans(metrics_df[, composite_cols, drop = FALSE], na.rm = TRUE)
+
+  # Get best model name
+  best_name <- rownames(metrics_df)[which.max(metrics_df$Composite)]
+
+  list(
+    best_model_name = best_name,
+    best_model = models[[best_name]],
+    metrics_table = metrics_df[order(-metrics_df$Composite), ]
   )
-  
-  # Add model-specific arguments
-  if (!is.null(models[[m]]$tuneLength)) {
-    args$tuneLength <- models[[m]]$tuneLength
-  }
-  if (m == "glm") {
-    args$family <- binomial()  # Note: binomial() function, not string
-  }
-  
-  model_list[[m]] <- do.call(train, args)
 }
 
 ```
+
 
 ```{r}
 # Compare models
@@ -1748,30 +1861,127 @@ resamps <- resamples(model_list)
 # Summary metrics
 summary(resamps)
 
-# Visual comparison
-dotplot(resamps, metric = "ROC")  # Or "Accuracy"/other metrics
+# Run after training models and splitting test_set
+model_eval <- select_best_model(model_list, test_set)
 
-# Identify best model (based on ROC)
-perf_metrics <- sapply(model_list, function(x) max(x$results$ROC, na.rm = TRUE))
-best_model_name <- names(which.max(perf_metrics))
-best_model <- model_list[[best_model_name]]
-
-cat("\nBest model is:", best_model_name, "with ROC of", max(perf_metrics), "\n")
+cat("Best model is:", model_eval$best_model_name, "\n")
+print(model_eval$metrics_table)
 
 # Evaluate on test set
-test_pred <- predict(best_model, newdata = test_set)  # Consistent naming
+test_pred <- predict(model_eval$best_model, newdata = test_set)  # Consistent naming
 conf_mat <- confusionMatrix(test_pred, test_set$vital, positive = levels(test_set$vital)[2])
 print(conf_mat)
 
 # ROC analysis
-if(nlevels(test_set$vital) == 2) {  # Only for binary classification
-  test_prob <- predict(best_model, newdata = test_set, type = "prob")[, 2]
-  roc_obj <- roc(response = test_set$vital, predictor = test_prob)
-  plot(roc_obj, print.auc = TRUE)
-  cat("AUC on test set:", auc(roc_obj), "\n")
+if (nlevels(test_set$vital) == 2) {  # Only for binary classification
+  
+  # Compute ROC objects for each model
+  roc_rf     <- roc(test_set$vital, predict(model_list$rf,       newdata = test_set, type = "prob")[, 2])
+  roc_glmnet <- roc(test_set$vital, predict(model_list$glmnet,   newdata = test_set, type = "prob")[, 2])
+  roc_knn    <- roc(test_set$vital, predict(model_list$knn,      newdata = test_set, type = "prob")[, 2])
+  roc_svm    <- roc(test_set$vital, predict(model_list$svmRadial,newdata = test_set, type = "prob")[, 2])
+  roc_glm    <- roc(test_set$vital, predict(model_list$glm,      newdata = test_set, type = "prob")[, 2])
+  
+  # Plot the first model (RF)
+  plot(roc_rf, col = "forestgreen", lwd = 2, main = "ROC Curves: RF, GLMNET, kNN, SVM")
+  
+  # Add other ROC lines
+  lines(roc_glmnet, col = "blue",       lwd = 2)
+  lines(roc_knn,    col = "darkorange", lwd = 2)
+  lines(roc_svm,    col = "purple",     lwd = 2)
+  lines(roc_glm,    col = "red",     lwd = 2)
+  
+  # Add legend
+  legend("bottomright", legend = c(
+    paste("RF        AUC =", round(auc(roc_rf),     3)),
+    paste("GLMNET    AUC =", round(auc(roc_glmnet), 3)),
+    paste("kNN       AUC =", round(auc(roc_knn),    3)),
+    paste("SVM       AUC =", round(auc(roc_svm),    3)),
+    paste("GLM      AUC =", round(auc(roc_glm),    3))
+  ),
+  col = c("forestgreen", "blue", "darkorange", "purple", "red"),
+  lwd = 2)
 }
 
 ```
+
+#### Model Comparison and Selection
+
+Each model was assessed on a held-out test set using multiple performance metrics, including:
+
+- **Test AUC** – discriminatory power  
+- **Accuracy** – overall correctness  
+- **Sensitivity and Specificity** – class-level performance  
+- **Balanced Accuracy** – average performance across both classes  
+- **Composite Score** – mean of AUC, accuracy, and balanced accuracy, used for ranking
+
+The **svmRadial** model ranked highest with a composite score of **0.720**, followed closely by **glmnet** (0.714). It also achieved the best **test AUC (0.72)**, high **accuracy (77.1%)**, and excellent **sensitivity (93.8%)**, making it the most reliable model for identifying “Alive” patients. In contrast, models like `rf` and `knn` showed high sensitivity but poor specificity, often overpredicting survival.
+
+####Confusion Matrix Analysis
+
+A closer analysis of the confusion matrix confirmed that while `svmRadial` performs well overall, its **specificity was limited (43.8%)**, with a tendency to misclassify “Dead” patients as “Alive.” This asymmetry was statistically validated by **McNemar’s test (p = 0.0056)**, indicating a significant prediction bias.
+
+### Ensemble Strategy
+
+To address this shortcoming, we implemented a **weighted soft voting ensemble**, combining predictions from multiple models proportionally to their performance, aiming to improve overall classification balance and reduce bias.
+
+```{r}
+# Get Composite scores from model_eval table
+comp_scores <- model_eval$metrics_table$Composite
+names(comp_scores) <- rownames(model_eval$metrics_table)
+
+# Normalize to get weights that sum to 1
+weights <- comp_scores[c("svmRadial", "rf", "glmnet", "knn")]
+weights <- weights / sum(weights)
+
+print(weights)  # Optional: inspect weights
+```
+
+```{r}
+# ---- WEIGHTED SOFT VOTING ----
+positive_class <- levels(test_set$vital)[2]
+
+# Get predicted probabilities
+probs <- data.frame(
+  svmRadial = predict(model_list$svmRadial, newdata = test_set, type = "prob")[, positive_class],
+  rf        = predict(model_list$rf,        newdata = test_set, type = "prob")[, positive_class],
+  glmnet    = predict(model_list$glmnet,    newdata = test_set, type = "prob")[, positive_class],
+  knn       = predict(model_list$knn,       newdata = test_set, type = "prob")[, positive_class]
+)
+
+# Ensure same order of weights as columns
+probs <- probs[, names(weights)]
+
+# Weighted average
+soft_vote_prob <- as.numeric(as.matrix(probs) %*% weights)
+
+# Final prediction
+soft_vote_pred <- factor(
+  ifelse(soft_vote_prob >= 0.5, positive_class, levels(test_set$vital)[1]),
+  levels = levels(test_set$vital)
+)
+
+# Evaluate
+conf_mat_soft <- confusionMatrix(soft_vote_pred, test_set$vital, positive = positive_class)
+print(conf_mat_soft)
+
+roc_soft <- roc(test_set$vital, soft_vote_prob)
+plot(roc_soft, main = "Weighted Soft Voting ROC", col = "darkred", lwd = 2, print.auc = TRUE)
+cat("Weighted Soft Voting AUC:", round(auc(roc_soft), 3), "\n")
+
+
+```
+#### Weighted Soft Voting – Performance Interpretation
+
+The **weighted soft voting ensemble** achieved an overall **accuracy of 72.9%**, indicating solid performance in classifying patient survival. Compared to the previously selected best individual model (`svmRadial`), the ensemble offers a better balance across outcome classes.
+
+The **balanced accuracy** was **69.5%**, slightly higher than that of `svmRadial` (68.8%), demonstrating improved class-level equity. The model maintained a high **sensitivity of 79.7%**, successfully identifying most patients who survived, while also improving **specificity to 59.4%**, reducing the tendency to misclassify deceased patients as “Alive.”
+
+Importantly, **McNemar’s test** yielded a **p-value of 1.000**, suggesting no statistically significant asymmetry in misclassification errors — a key improvement over `svmRadial`, which showed a bias toward overpredicting survival. This indicates that the ensemble treats both classes more symmetrically and fairly.
+
+The **AUC** of the ensemble was **0.734**, slightly outperforming all individual models and confirming its superior discrimination capability.
+
+In summary, the weighted soft voting model provides a **more balanced and reliable classification**, making it a strong candidate for clinical decision-support scenarios where both false negatives and false positives carry meaningful consequences.
 
 ## Bibliography
 
