@@ -170,3 +170,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 scripts_R/.RData
+scripts_R/.Rhistory
