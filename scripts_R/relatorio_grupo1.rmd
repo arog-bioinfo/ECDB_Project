@@ -21,10 +21,9 @@ editor_options:
     wrap: sentence
 ---
 
-<img src="EEUMLOGO.png" alt="Logo da Empresa" style="float:right; margin: 10px 10px 0 0; width: 110px; height: auto;"/>
+![](images/EEUMLOGO.png){alt="Logo da Empresa" style="float:right; margin: 10px 10px 0 0;" width="85"}
 
-{.tabset}
-
+::: tabset
 # Phase 1 {.tabset}
 
 ## Dataset Download and Import
@@ -142,42 +141,42 @@ The **`GDCdownload()`** function is then used to download the data according to 
 # Define the base directory
 
 # base_dir <- "/Users/mariacarvalho/Desktop/Mestrado/2º\ semestre/Extração"  # Change this to your desired path
-base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
+#base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
 # base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"
 
 
-# Create directory if it doesn't exist
-if (!dir.exists(base_dir)) {
-  dir.create(base_dir, recursive = TRUE)
-}
-
-# File path for storing processed data
-gdc_data <- file.path(base_dir, "GDCdata")
-rna_seq_file <- file.path(base_dir, "mRNA_TCGA-LUAD.rda")
-
-# Check if the data file already exists, if not, download and process
-if (!file.exists(rna_seq_file)) {
-
-  query_LUAD <- GDCquery(
-    project = "TCGA-LUAD",
-    data.category = "Transcriptome Profiling",
-    data.type = "Gene Expression Quantification",
-    workflow.type = "STAR - Counts"
-  )
-
-  GDCdownload(query = query_LUAD, directory = gdc_data)
-
-  rna_seq_LUAD <- GDCprepare(
-    query = query_LUAD,
-    save = TRUE,
-    save.filename = rna_seq_file,
-    directory = gdc_data
-  )
-  rm(query_LUAD)
-} else {
-  rna_seq_LUAD <- get(load(rna_seq_file))
-  rm(data)
-}
+# # Create directory if it doesn't exist
+# if (!dir.exists(base_dir)) {
+#   dir.create(base_dir, recursive = TRUE)
+# }
+# 
+# # File path for storing processed data
+# gdc_data <- file.path(base_dir, "GDCdata")
+# rna_seq_file <- file.path(base_dir, "mRNA_TCGA-LUAD.rda")
+# 
+# # Check if the data file already exists, if not, download and process
+# if (!file.exists(rna_seq_file)) {
+# 
+#   query_LUAD <- GDCquery(
+#     project = "TCGA-LUAD",
+#     data.category = "Transcriptome Profiling",
+#     data.type = "Gene Expression Quantification",
+#     workflow.type = "STAR - Counts"
+#   )
+# 
+#   GDCdownload(query = query_LUAD, directory = gdc_data)
+# 
+#   rna_seq_LUAD <- GDCprepare(
+#     query = query_LUAD,
+#     save = TRUE,
+#     save.filename = rna_seq_file,
+#     directory = gdc_data
+#   )
+#   rm(query_LUAD)
+# } else {
+#   rna_seq_LUAD <- get(load(rna_seq_file))
+#   rm(data)
+# }
 
 ```
 
@@ -683,6 +682,9 @@ ddsSE = DESeqDataSetFromMatrix(countData = ADC_data, colData = clinical_df, desi
 ddsSE = ddsSE[rowSums(counts(ddsSE) >= 20) >= 4, ]
 dim(ddsSE)
 ```
+
+After constructing the `DESeqDataSet` object and applying the low-count filtering criteria, the dataset retained **33,371 genes** across **360 samples**.\
+This filtered set includes only genes with sufficient expression levels (≥20 counts in ≥4 samples), ensuring robust statistical power for downstream differential expression analysis based on tissue type.
 
 Based on the filtered dataset, we performed the differential expression analysis using the `tissue_type` factor as the explanatory variable in the model. The **DESeq** function was applied to normalize the data and fit the model, and the `results` function was used to extract the statistical results of the analysis. A significance threshold of α = 0.05 was used to identify genes differentially expressed between vital status groups.
 
@@ -1779,3 +1781,4 @@ if(nlevels(test_set$vital) == 2) {  # Only for binary classification
 2.  Cancer Treatment Centers of America. (n.d.). Adenocarcinoma of the lung. Cancer Treatment Centers of America. <https://www.cancercenter.com/cancer-types/lung-cancer/types/adenocarcinoma-of-the-lung>
 3.  American Cancer Society. (n.d.). What is lung cancer? American Cancer Society. <https://www.cancer.org/cancer/types/lung-cancer/about/what-is.html>
 4.  Lung Cancer Foundation of America. (n.d.). Adenocarcinoma of the lung: An introduction. Lung Cancer Foundation of America. <https://lcfamerica.org/about-lung-cancer/diagnosis/types/adenocarcinoma/>
+:::
