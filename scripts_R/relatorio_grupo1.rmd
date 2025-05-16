@@ -7,7 +7,6 @@ author:
 date: "`r Sys.Date()`"
 output:
   html_document:
-    df_print: paged
     toc: true
     toc_depth: 3
     toc_float: true
@@ -143,42 +142,42 @@ The **`GDCdownload()`** function is then used to download the data according to 
 # Define the base directory
 
 # base_dir <- "/Users/mariacarvalho/Desktop/Mestrado/2º\ semestre/Extração"  # Change this to your desired path
-#base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
+base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
 # base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"
 
 
-# # Create directory if it doesn't exist
-# if (!dir.exists(base_dir)) {
-#   dir.create(base_dir, recursive = TRUE)
-# }
-# 
-# # File path for storing processed data
-# gdc_data <- file.path(base_dir, "GDCdata")
-# rna_seq_file <- file.path(base_dir, "mRNA_TCGA-LUAD.rda")
-# 
-# # Check if the data file already exists, if not, download and process
-# if (!file.exists(rna_seq_file)) {
-# 
-#   query_LUAD <- GDCquery(
-#     project = "TCGA-LUAD",
-#     data.category = "Transcriptome Profiling",
-#     data.type = "Gene Expression Quantification",
-#     workflow.type = "STAR - Counts"
-#   )
-# 
-#   GDCdownload(query = query_LUAD, directory = gdc_data)
-# 
-#   rna_seq_LUAD <- GDCprepare(
-#     query = query_LUAD,
-#     save = TRUE,
-#     save.filename = rna_seq_file,
-#     directory = gdc_data
-#   )
-#   rm(query_LUAD)
-# } else {
-#   rna_seq_LUAD <- get(load(rna_seq_file))
-#   rm(data)
-# }
+# Create directory if it doesn't exist
+if (!dir.exists(base_dir)) {
+  dir.create(base_dir, recursive = TRUE)
+}
+
+# File path for storing processed data
+gdc_data <- file.path(base_dir, "GDCdata")
+rna_seq_file <- file.path(base_dir, "mRNA_TCGA-LUAD.rda")
+
+# Check if the data file already exists, if not, download and process
+if (!file.exists(rna_seq_file)) {
+
+  query_LUAD <- GDCquery(
+    project = "TCGA-LUAD",
+    data.category = "Transcriptome Profiling",
+    data.type = "Gene Expression Quantification",
+    workflow.type = "STAR - Counts"
+  )
+
+  GDCdownload(query = query_LUAD, directory = gdc_data)
+
+  rna_seq_LUAD <- GDCprepare(
+    query = query_LUAD,
+    save = TRUE,
+    save.filename = rna_seq_file,
+    directory = gdc_data
+  )
+  rm(query_LUAD)
+} else {
+  rna_seq_LUAD <- get(load(rna_seq_file))
+  rm(data)
+}
 
 ```
 
@@ -962,7 +961,7 @@ This version appears to show fewer significantly regulated genes, as seen by the
 The goal of this section is to identify genes whose expression levels differ significantly between the two clinical conditions ("Alive" vs. "Dead") and prepare the results for downstream enrichment analysis. We use a generalized linear model (GLM) approach implemented in the edgeR package to perform this task.
 
 ```{r}
-vital_status = as.factor(filtered_samples$vital_status)
+vital_status = as.factor(clinical_df$vital_status)
 design = model.matrix(~vital_status)
 
 dgeObj = estimateDisp(dgeObj, design = design)
@@ -1081,7 +1080,7 @@ for (gene in genes_to_plot) {
 gene_name=c()
 for (gene in rownames(res)) {
   gene_name =c(gene_name,
-               gene_metadata[gene,"gene_name"])
+               metadata_row[gene,"gene_name"])
 }
 
 ```
@@ -1253,7 +1252,7 @@ ggplot(pca_df_merged, aes(x = PC1, y = PC2, color = race, shape = vital_status))
 
 #By AJCC Pathologic Stage and Vital Status
 ggplot(pca_df_merged, aes(x = PC1, y = PC2, color = ajcc_pathologic_stage, shape = vital_status)) +
-  geom_point(size = 2.5, alpha = 0.8) +
+  geom_point(size = 2.5, alpha = 0.8) +git
   labs(title = "PCA: AJCC Stage & Vital Status", x = "PC1", y = "PC2") +
   theme_minimal()
 
