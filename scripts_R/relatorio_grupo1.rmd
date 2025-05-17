@@ -1391,7 +1391,7 @@ ggplot(pca_df_merged, aes(x = PC1, y = PC2, color = race, shape = vital_status))
 
 #By AJCC Pathologic Stage and Vital Status
 ggplot(pca_df_merged, aes(x = PC1, y = PC2, color = ajcc_pathologic_stage, shape = vital_status)) +
-  geom_point(size = 2.5, alpha = 0.8) +git
+  geom_point(size = 2.5, alpha = 0.8) +
   labs(title = "PCA: AJCC Stage & Vital Status", x = "PC1", y = "PC2") +
   theme_minimal()
 
@@ -1943,7 +1943,7 @@ cv_control <- trainControl(
 )
 ```
 
-```{r, echo=False, results=False}
+```{r, echo=FALSE, results=FALSE}
 # List of models to compare with tuning parameters
 models <- list(
   rf = list(method = "rf", tuneLength = 5),
@@ -2180,7 +2180,7 @@ This indicates that the ensemble treats both classes more symmetrically and fair
 
 The **AUC** of the ensemble was **0.734**, slightly outperforming all individual models and confirming its superior discrimination capability.
 
-In summary, the weighted soft voting model provides a **more balanced and reliable classification**, making it a strong candidate for clinical decision-support scenarios where both false negatives and false positives carry meaningful consequences.
+In summary, the weighted soft voting model provides a **more balanced and reliable classification**, making it a strong candidate for clinical decision-support scenarios where both FALSE negatives and FALSE positives carry meaningful consequences.
 
 ## Bibliography
 
