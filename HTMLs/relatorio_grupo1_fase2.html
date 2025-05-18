@@ -4032,54 +4032,6 @@ assessment of each model’s ability to generalize to unseen data.</p>
 <span id="cb221-12"><a href="#cb221-12" tabindex="-1"></a>  <span class="at">verboseIter =</span> <span class="cn">TRUE</span>,  <span class="co"># Recommended to see progress</span></span>
 <span id="cb221-13"><a href="#cb221-13" tabindex="-1"></a>  <span class="at">sampling =</span> <span class="st">&quot;smote&quot;</span></span>
 <span id="cb221-14"><a href="#cb221-14" tabindex="-1"></a>)</span></code></pre></div>
-<div class="sourceCode" id="cb228"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb228-1"><a href="#cb228-1" tabindex="-1"></a>select_best_model <span class="ot">&lt;-</span> <span class="cf">function</span>(models, test_data, <span class="at">positive_class =</span> <span class="st">&quot;Alive&quot;</span>) {</span>
-<span id="cb228-2"><a href="#cb228-2" tabindex="-1"></a>  results <span class="ot">&lt;-</span> <span class="fu">lapply</span>(models, <span class="cf">function</span>(model) {</span>
-<span id="cb228-3"><a href="#cb228-3" tabindex="-1"></a>    <span class="co"># Try training ROC</span></span>
-<span id="cb228-4"><a href="#cb228-4" tabindex="-1"></a>    roc_train <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(<span class="fu">max</span>(model<span class="sc">$</span>results<span class="sc">$</span>ROC, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NA</span>)</span>
-<span id="cb228-5"><a href="#cb228-5" tabindex="-1"></a></span>
-<span id="cb228-6"><a href="#cb228-6" tabindex="-1"></a>    <span class="co"># Predictions</span></span>
-<span id="cb228-7"><a href="#cb228-7" tabindex="-1"></a>    pred <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(<span class="fu">predict</span>(model, <span class="at">newdata =</span> test_data), <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NA</span>)</span>
-<span id="cb228-8"><a href="#cb228-8" tabindex="-1"></a>    prob <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(<span class="fu">predict</span>(model, <span class="at">newdata =</span> test_data, <span class="at">type =</span> <span class="st">&quot;prob&quot;</span>)[, <span class="dv">2</span>], <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NA</span>)</span>
-<span id="cb228-9"><a href="#cb228-9" tabindex="-1"></a></span>
-<span id="cb228-10"><a href="#cb228-10" tabindex="-1"></a>    <span class="co"># Confusion Matrix</span></span>
-<span id="cb228-11"><a href="#cb228-11" tabindex="-1"></a>    cm <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(<span class="fu">confusionMatrix</span>(pred, test_data<span class="sc">$</span>vital, <span class="at">positive =</span> positive_class), <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span>)</span>
-<span id="cb228-12"><a href="#cb228-12" tabindex="-1"></a></span>
-<span id="cb228-13"><a href="#cb228-13" tabindex="-1"></a>    <span class="co"># AUC</span></span>
-<span id="cb228-14"><a href="#cb228-14" tabindex="-1"></a>    auc_test <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(<span class="fu">auc</span>(<span class="fu">roc</span>(test_data<span class="sc">$</span>vital, prob)), <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NA</span>)</span>
-<span id="cb228-15"><a href="#cb228-15" tabindex="-1"></a></span>
-<span id="cb228-16"><a href="#cb228-16" tabindex="-1"></a>    <span class="co"># Extract metrics safely</span></span>
-<span id="cb228-17"><a href="#cb228-17" tabindex="-1"></a>    acc <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(cm)) cm<span class="sc">$</span>overall[<span class="st">&quot;Accuracy&quot;</span>] <span class="cf">else</span> <span class="cn">NA</span></span>
-<span id="cb228-18"><a href="#cb228-18" tabindex="-1"></a>    sens <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(cm)) cm<span class="sc">$</span>byClass[<span class="st">&quot;Sensitivity&quot;</span>] <span class="cf">else</span> <span class="cn">NA</span></span>
-<span id="cb228-19"><a href="#cb228-19" tabindex="-1"></a>    spec <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(cm)) cm<span class="sc">$</span>byClass[<span class="st">&quot;Specificity&quot;</span>] <span class="cf">else</span> <span class="cn">NA</span></span>
-<span id="cb228-20"><a href="#cb228-20" tabindex="-1"></a>    bal_acc <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(cm)) cm<span class="sc">$</span>byClass[<span class="st">&quot;Balanced Accuracy&quot;</span>] <span class="cf">else</span> <span class="cn">NA</span></span>
-<span id="cb228-21"><a href="#cb228-21" tabindex="-1"></a></span>
-<span id="cb228-22"><a href="#cb228-22" tabindex="-1"></a>    <span class="fu">c</span>(</span>
-<span id="cb228-23"><a href="#cb228-23" tabindex="-1"></a>      <span class="at">TrainROC    =</span> roc_train,</span>
-<span id="cb228-24"><a href="#cb228-24" tabindex="-1"></a>      <span class="at">TestAUC     =</span> auc_test,</span>
-<span id="cb228-25"><a href="#cb228-25" tabindex="-1"></a>      <span class="at">Accuracy    =</span> acc,</span>
-<span id="cb228-26"><a href="#cb228-26" tabindex="-1"></a>      <span class="at">Sensitivity =</span> sens,</span>
-<span id="cb228-27"><a href="#cb228-27" tabindex="-1"></a>      <span class="at">Specificity =</span> spec,</span>
-<span id="cb228-28"><a href="#cb228-28" tabindex="-1"></a>      <span class="at">BalancedAcc =</span> bal_acc</span>
-<span id="cb228-29"><a href="#cb228-29" tabindex="-1"></a>    )</span>
-<span id="cb228-30"><a href="#cb228-30" tabindex="-1"></a>  })</span>
-<span id="cb228-31"><a href="#cb228-31" tabindex="-1"></a></span>
-<span id="cb228-32"><a href="#cb228-32" tabindex="-1"></a>  <span class="co"># Compile results into a data frame</span></span>
-<span id="cb228-33"><a href="#cb228-33" tabindex="-1"></a>  metrics_df <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">do.call</span>(rbind, results))</span>
-<span id="cb228-34"><a href="#cb228-34" tabindex="-1"></a>  <span class="fu">rownames</span>(metrics_df) <span class="ot">&lt;-</span> <span class="fu">names</span>(models)</span>
-<span id="cb228-35"><a href="#cb228-35" tabindex="-1"></a></span>
-<span id="cb228-36"><a href="#cb228-36" tabindex="-1"></a>  <span class="co"># Calculate a Composite Score — if all columns exist</span></span>
-<span id="cb228-37"><a href="#cb228-37" tabindex="-1"></a>  composite_cols <span class="ot">&lt;-</span> <span class="fu">intersect</span>(<span class="fu">c</span>(<span class="st">&quot;TestAUC&quot;</span>, <span class="st">&quot;BalancedAcc&quot;</span>, <span class="st">&quot;Accuracy&quot;</span>), <span class="fu">colnames</span>(metrics_df))</span>
-<span id="cb228-38"><a href="#cb228-38" tabindex="-1"></a>  metrics_df<span class="sc">$</span>Composite <span class="ot">&lt;-</span> <span class="fu">rowMeans</span>(metrics_df[, composite_cols, <span class="at">drop =</span> <span class="cn">FALSE</span>], <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb228-39"><a href="#cb228-39" tabindex="-1"></a></span>
-<span id="cb228-40"><a href="#cb228-40" tabindex="-1"></a>  <span class="co"># Get best model name</span></span>
-<span id="cb228-41"><a href="#cb228-41" tabindex="-1"></a>  best_name <span class="ot">&lt;-</span> <span class="fu">rownames</span>(metrics_df)[<span class="fu">which.max</span>(metrics_df<span class="sc">$</span>Composite)]</span>
-<span id="cb228-42"><a href="#cb228-42" tabindex="-1"></a></span>
-<span id="cb228-43"><a href="#cb228-43" tabindex="-1"></a>  <span class="fu">list</span>(</span>
-<span id="cb228-44"><a href="#cb228-44" tabindex="-1"></a>    <span class="at">best_model_name =</span> best_name,</span>
-<span id="cb228-45"><a href="#cb228-45" tabindex="-1"></a>    <span class="at">best_model =</span> models[[best_name]],</span>
-<span id="cb228-46"><a href="#cb228-46" tabindex="-1"></a>    <span class="at">metrics_table =</span> metrics_df[<span class="fu">order</span>(<span class="sc">-</span>metrics_df<span class="sc">$</span>Composite), ]</span>
-<span id="cb228-47"><a href="#cb228-47" tabindex="-1"></a>  )</span>
-<span id="cb228-48"><a href="#cb228-48" tabindex="-1"></a>}</span></code></pre></div>
 <div class="sourceCode" id="cb229"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb229-1"><a href="#cb229-1" tabindex="-1"></a><span class="co"># Compare models</span></span>
 <span id="cb229-2"><a href="#cb229-2" tabindex="-1"></a>resamps <span class="ot">&lt;-</span> <span class="fu">resamples</span>(model_list)</span>
 <span id="cb229-3"><a href="#cb229-3" tabindex="-1"></a></span>
