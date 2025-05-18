@@ -10,11 +10,11 @@ We are using the **Lung Adenocarcinoma (TCGA, GDC)** dataset, available at [cBio
 ```
 ├── htmls/                         # HTML outputs
 │   └── relatorio_grupo1_fase1.html
+│   └── relatorio_grupo1_fase2.html
 │
 ├── scripts_R/                    # R and Rmd scripts
-│   └── relatorio_grupo1_fase1.rmd
+│   └── relatorio_grupo1.rmd
 │
-├── relatorio_grupo1_fase1_files/
 │
 ├── data_csv/                     # CSV data files
 │
