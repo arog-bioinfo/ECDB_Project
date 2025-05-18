@@ -1276,9 +1276,11 @@ sum(enrichment$padj<0.01)
 head(enrichment)
 ```
 
-# Phase 2 - Unsupervised Analysis {.tabset}
+# Phase 2 {.tabset}
 
-## Dimensionality Reduction {.tabset}
+## Unsupervised Analysis {.tabset}
+
+### Dimensionality Reduction {.tabset}
 
 High-dimensional biological datasets, such as transcriptomic profiles, often contain thousands of variables per sample.
 This complexity can obscure meaningful biological patterns or relationships between samples.\
@@ -1289,7 +1291,7 @@ In this analysis, we used a combination of: - **Principal Component Analysis (PC
 These methods complement each other: PCA provides a general overview of variance across the dataset, while t-SNE and UMAP allow for more refined visualization of local similarities and potential sample groupings.
 Together, they offer a robust approach to exploring underlying structures that may reflect biological or clinical relevance.
 
-### PCA (Principal Component Analysis)
+#### PCA (Principal Component Analysis)
 
 ```{r}
 pca_data = t(ADC_data_CPM_log)  # transpose: samples in columns, genes in rows
@@ -1352,7 +1354,7 @@ This indicates that PC1 and PC2 capture only limited structure within the datase
 Furthermore, the explained variance plot reveals that **253 components** are required to account for at least **95% of the total variance**, reflecting the high dimensionality and complexity of the transcriptomic data.
 This distribution suggests that meaningful biological patterns may be embedded in higher-order or nonlinear dimensions, motivating the use of alternative dimensionality reduction techniques such as t-SNE and UMAP.
 
-#### PCA by Clinical Variables
+**PCA by Clinical Variables**
 
 To better investigate the potential biological or clinical groupings within the data, the PCA results were visualized with samples colored by key clinical features.
 These visualizations help assess whether specific sample groupings, observed in lower-dimensional space, correlate with clinical variables such as **vital status**, **primary diagnosis**, **gender**, **race**, **AJCC stage**, or **age at diagnosis**.
@@ -1433,7 +1435,7 @@ We therefore proceed with:
 
 These methods are more suitable for revealing potentially **nonlinear biological variation** that may correspond to latent clinical subtypes.
 
-### t-SNE (t-Distributed Stochastic Neighbor Embedding)
+#### t-SNE (t-Distributed Stochastic Neighbor Embedding)
 
 t-SNE is a non-linear dimensionality reduction technique that maps high-dimensional data to a low-dimensional space by preserving the probability distribution of pairwise similarities.
 It is particularly well-suited to reveal **local clusters** or subgroup patterns that PCA might miss due to its linear nature.
@@ -1512,7 +1514,7 @@ While t-SNE exposes some local structure, these patterns **do not align with any
 
 These results reinforce the conclusion that **the clinical variables analyzed do not correspond to distinct transcriptomic profiles**, even in a nonlinear embedding.
 
-### UMAP (Uniform Manifold Approximation and Projection)
+#### UMAP (Uniform Manifold Approximation and Projection)
 
 UMAP is another powerful non-linear method that builds on manifold learning and topological data analysis.
 Compared to t-SNE, UMAP generally offers **better global structure retention** and can be tuned to emphasize either local or global features.
@@ -1571,7 +1573,7 @@ This indicates that while UMAP captures meaningful relationships in the data, **
 UMAP projections revealed more defined structures compared to PCA and t-SNE, with denser local groupings and clearer spatial organization.
 However, these structures did not correspond to the available clinical features, reinforcing the likelihood that **other, unmeasured biological factors** underlie the observed transcriptomic variation.
 
-## Clustering {.tabset}
+### Clustering {.tabset}
 
 Clustering is a type of unsupervised machine learning that finds hidden patterns in data by grouping similar items together.
 It uses distance or similarity measurements to form groups (clusters) so that items in the same group are as similar as possible, and items in different groups are as different as possible.
@@ -1589,7 +1591,7 @@ rna_expression_matrix <- as.matrix(assay(ddsSE_normalized))
 rna_expression_transposed <- t(rna_expression_matrix)
 ```
 
-### Hierarchical Clustering
+#### Hierarchical Clustering
 
 Hierarchical clustering follows a bottom-up approach.
 It starts with each item as its own cluster and then gradually combines the closest clusters until all items are in a single group.
@@ -1608,7 +1610,7 @@ euclidean_dist_genes <- dist(ranked_gene_matrix)
 
 ```
 
-#### Gene Clustering
+**Gene Clustering**
 
 To investigate patterns of co-expression among genes, we performed hierarchical clustering on a subset of genes selected in an unsupervised manner.
 We selected the top 30 most variable genes across all samples by ranking genes according to their expression variance.
@@ -1647,7 +1649,7 @@ The average linkage dendrogram appears to produce the most coherent and interpre
 The heatmap visualizes expression values across samples: darker colors indicate lower expression, while lighter colors suggest higher expression.
 We observe that some genes cluster together with very similar expression profiles across samples, suggesting potential co-regulation or functional relationships.
 
-#### Sample Clustering
+**Sample Clustering**
 
 To explore patterns among samples (patients), we applied *hierarchical clustering* using the same top 30 most variable genes selected previously.
 These genes were chosen without reference to any clinical labels to ensure the clustering reflects *intrinsic transcriptomic structure*.
@@ -1736,13 +1738,13 @@ This made it easier to visually identify whether clinical variables correspond t
 While the clusters were defined using unsupervised transcriptomic features, some branch-level enrichment for survival status is apparent.
 This suggests that transcriptomic variation may partially reflect clinical outcome.
 
-### K-means Clustering
+#### K-means Clustering
 
 K-means is a clustering algorithm that divides data into a set number (K) of groups.
 It does this by placing each data point into the group with the nearest center (centroid), and then adjusting the centers to improve the fit.
 The goal is to make sure that items in the same group are close to the center and each other.
 
-#### Finding the Best Number of Clusters
+**Finding the Best Number of Clusters**
 
 We used the *elbow method* to determine an appropriate number of clusters (K).
 The algorithm was run for K = 2 to 10, and for each value of K, we computed the within-*cluster sum of squares (WSS)* — a measure of how tightly samples are grouped.
@@ -1772,7 +1774,7 @@ The Within-Cluster Sum of Squares (WSS) decreases with increasing K, as expected
 A noticeable "elbow" appears at *K = 4*, where the rate of WSS improvement begins to slow.
 This suggests that *4 clusters* is a good balance between model complexity and separation — used as the basis for final clustering in the next step.
 
-#### Comparing Clusters to Clinical Data
+**Comparing Clusters to Clinical Data**
 
 Once we chose a value for K, we ran K-means again to group the samples.
 We then compared the group assignments with a known clinical variable (vital_status) using a cross-tabulation table.
@@ -1796,7 +1798,7 @@ This output compares the unsupervised K-means clusters (K = 4) to the known clin
 \*\*Clusters 3 and 4\* are also moderately sized and show slight enrichment for "Alive" samples.
 Although the clusters were computed without using any clinical labels, some mild separation by outcome is observed — hinting at biological relevance of the clusters.
 
-## Supervised Analysis {.tabset}
+### Supervised Analysis {.tabset}
 
 Supervised analysis is a machine learning approach where models are trained using an input dataset along with known labels (outcomes) associated with those data points.\
 During training, the model learns the relationship between the input features and their labels by iteratively adjusting its internal parameters to minimize the error between its predictions and the true labels.\
@@ -1807,7 +1809,7 @@ For example, they can predict clinical phenotypes based on gene expression profi
 
 ------------------------------------------------------------------------
 
-### Steps for LUAD Gene Expression Data
+#### Steps for LUAD Gene Expression Data
 
 **1. Data Preparation**\
 We begin by preparing the normalized gene expression data for use in machine learning models.
@@ -1900,7 +1902,7 @@ print(prop.table(table(test_set$vital)))
 
 ```
 
-### Model Simulation
+#### Model Simulation
 
 After preprocessing the gene expression data, we trained and evaluated multiple supervised machine learning models to classify patient survival status ("Alive" vs. "Dead") based on differential gene expression.
 
@@ -2098,7 +2100,7 @@ if (nlevels(test_set$vital) == 2) {  # Only for binary classification
 
 ```
 
-#### Model Comparison and Selection
+**Model Comparison and Selection**
 
 Each model was assessed on a held-out test set using multiple performance metrics, including:
 
@@ -2112,11 +2114,11 @@ The **svmRadial** model ranked highest with a composite score of **0.720**, foll
 It also achieved the best **test AUC (0.72)**, high **accuracy (77.1%)**, and excellent **sensitivity (93.8%)**, making it the most reliable model for identifying “Alive” patients.
 In contrast, models like `rf` and `knn` showed high sensitivity but poor specificity, often overpredicting survival.
 
-####Confusion Matrix Analysis
+**Confusion Matrix Analysis**
 
 A closer analysis of the confusion matrix confirmed that while `svmRadial` performs well overall, its **specificity was limited (43.8%)**, with a tendency to misclassify “Dead” patients as “Alive.” This asymmetry was statistically validated by **McNemar’s test (p = 0.0056)**, indicating a significant prediction bias.
 
-### Ensemble Strategy
+#### Ensemble Strategy
 
 To address this shortcoming, we implemented a **weighted soft voting ensemble**, combining predictions from multiple models proportionally to their performance, aiming to improve overall classification balance and reduce bias.
 
@@ -2167,7 +2169,7 @@ cat("Weighted Soft Voting AUC:", round(auc(roc_soft), 3), "\n")
 
 ```
 
-#### Weighted Soft Voting – Performance Interpretation
+**Weighted Soft Voting – Performance Interpretation**
 
 The **weighted soft voting ensemble** achieved an overall **accuracy of 72.9%**, indicating solid performance in classifying patient survival.
 Compared to the previously selected best individual model (`svmRadial`), the ensemble offers a better balance across outcome classes.
@@ -2182,7 +2184,7 @@ The **AUC** of the ensemble was **0.734**, slightly outperforming all individual
 
 In summary, the weighted soft voting model provides a **more balanced and reliable classification**, making it a strong candidate for clinical decision-support scenarios where both FALSE negatives and FALSE positives carry meaningful consequences.
 
-## Bibliography
+# Bibliography
 
 1.  Myers DJ, Wallen JM. Lung Adenocarcinoma. 2023 Jun 12. In: StatPearls [Internet]. Treasure Island (FL): StatPearls Publishing; 2025 Jan–. PMID: 30137862.
 2.  Cancer Treatment Centers of America. (n.d.). Adenocarcinoma of the lung. Cancer Treatment Centers of America. <https://www.cancercenter.com/cancer-types/lung-cancer/types/adenocarcinoma-of-the-lung>
