@@ -150,8 +150,8 @@ It is worth noting that this function also allows saving the data in **.RData** 
 # Define the base directory
 
 # base_dir <- "/Users/mariacarvalho/Desktop/Mestrado/2º\ semestre/Extração"  # Change this to your desired path
-#base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
-base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"
+base_dir <- "/home/arog/Documents/university/2_semestre/ECDB/project_data"
+#base_dir <- "C:\\Users\\catar\\OneDrive\\Ambiente de Trabalho\\extracao\\projeto_r\\dadossss"
 
 
 # Create directory if it doesn't exist
@@ -1999,47 +1999,87 @@ for (m in names(models)) {
 
 ```{r}
 select_best_model <- function(models, test_data, positive_class = "Alive") {
-  results <- lapply(models, function(model) {
-    # Try training ROC
-    roc_train <- tryCatch(max(model$results$ROC, na.rm = TRUE), error = function(e) NA)
-
-    # Predictions
-    pred <- tryCatch(predict(model, newdata = test_data), error = function(e) NA)
-    prob <- tryCatch(predict(model, newdata = test_data, type = "prob")[, 2], error = function(e) NA)
-
-    # Confusion Matrix
-    cm <- tryCatch(confusionMatrix(pred, test_data$vital, positive = positive_class), error = function(e) NULL)
-
-    # AUC
-    auc_test <- tryCatch(auc(roc(test_data$vital, prob)), error = function(e) NA)
-
-    # Extract metrics safely
-    acc <- if (!is.null(cm)) cm$overall["Accuracy"] else NA
-    sens <- if (!is.null(cm)) cm$byClass["Sensitivity"] else NA
-    spec <- if (!is.null(cm)) cm$byClass["Specificity"] else NA
-    bal_acc <- if (!is.null(cm)) cm$byClass["Balanced Accuracy"] else NA
-
-    c(
-      TrainROC    = roc_train,
-      TestAUC     = auc_test,
-      Accuracy    = acc,
-      Sensitivity = sens,
-      Specificity = spec,
-      BalancedAcc = bal_acc
+  # Verify test_data has the required column
+  if (!"vital" %in% colnames(test_data)) {
+    stop("test_data must contain a 'vital' column")
+  }
+  
+  results <- lapply(names(models), function(model_name) {
+    model <- models[[model_name]]
+    
+    # Initialize all metrics as NA
+    metrics <- c(
+      TrainROC = NA,
+      TestAUC = NA,
+      Accuracy = NA,
+      Sensitivity = NA,
+      Specificity = NA,
+      BalancedAcc = NA
     )
+    
+    tryCatch({
+      # Training ROC
+      if ("ROC" %in% colnames(model$results)) {
+        metrics["TrainROC"] <- max(model$results$ROC, na.rm = TRUE)
+      }
+      
+      # Predictions
+      pred <- predict(model, newdata = test_data)
+      prob <- predict(model, newdata = test_data, type = "prob")[, positive_class]
+      
+      # Ensure predictions have same levels as test data
+      pred_factor <- factor(pred, levels = levels(test_data$vital))
+      
+      # Confusion Matrix
+      cm <- confusionMatrix(pred_factor, test_data$vital, positive = positive_class)
+      
+      # AUC calculation
+      if (length(unique(test_data$vital)) == 2) {
+        roc_obj <- roc(response = test_data$vital, predictor = prob, 
+                      levels = rev(levels(test_data$vital)))
+        metrics["TestAUC"] <- as.numeric(auc(roc_obj))
+      }
+      
+      # Extract metrics
+      metrics["Accuracy"] <- cm$overall["Accuracy"]
+      metrics["Sensitivity"] <- cm$byClass["Sensitivity"]
+      metrics["Specificity"] <- cm$byClass["Specificity"]
+      metrics["BalancedAcc"] <- cm$byClass["Balanced Accuracy"]
+      
+    }, error = function(e) {
+      warning(paste("Error evaluating model", model_name, ":", e$message))
+    })
+    
+    return(metrics)
   })
-
-  # Compile results into a data frame
+  
+  # Name the results
+  names(results) <- names(models)
+  
+  # Convert to data frame
   metrics_df <- as.data.frame(do.call(rbind, results))
-  rownames(metrics_df) <- names(models)
-
-  # Calculate a Composite Score — if all columns exist
-  composite_cols <- intersect(c("TestAUC", "BalancedAcc", "Accuracy"), colnames(metrics_df))
-  metrics_df$Composite <- rowMeans(metrics_df[, composite_cols, drop = FALSE], na.rm = TRUE)
-
-  # Get best model name
+  
+  # Calculate composite score using available metrics
+  valid_metrics <- c("TestAUC", "BalancedAcc", "Accuracy", "Sensitivity", "Specificity")
+  metrics_to_use <- intersect(valid_metrics, colnames(metrics_df))
+  
+  # Normalize metrics to 0-1 range if needed
+  for (m in metrics_to_use) {
+    if (any(metrics_df[[m]] > 1, na.rm = TRUE)) {
+      metrics_df[[m]] <- metrics_df[[m]] / 100
+    }
+  }
+  
+  # Calculate composite score (average of available metrics)
+  metrics_df$Composite <- rowMeans(metrics_df[, metrics_to_use, drop = FALSE], na.rm = TRUE)
+  
+  # Get best model
+  if (all(is.na(metrics_df$Composite))) {
+    stop("No valid models could be evaluated")
+  }
+  
   best_name <- rownames(metrics_df)[which.max(metrics_df$Composite)]
-
+  
   list(
     best_model_name = best_name,
     best_model = models[[best_name]],
