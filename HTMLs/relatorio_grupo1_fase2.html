@@ -4122,11 +4122,11 @@ assessment of each model’s ability to generalize to unseen data.</p>
 <div class="sourceCode" id="cb244"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb244-1"><a href="#cb244-1" tabindex="-1"></a><span class="fu">print</span>(model_eval<span class="sc">$</span>metrics_table)</span></code></pre></div>
 <pre><code>
 ##            TrainROC   TestAUC    Accuracy  Sensitivity Specificity Balanced_Acc Composite
-## rf        0.5621343  0.7770996   0.71875    0.937500     0.28125    0.6093750   0.7770996
-## glmnet    0.5667972  0.7363281   0.71875    0.812500     0.53125    0.6718750   0.7363281
-## svmRadial 0.5647005  0.7358398   0.68750    0.875000     0.31250    0.5937500   0.7358398
-## knn       0.5574651  0.6669922   0.43750    0.203125     0.90625    0.5546875   0.6669922
-## glm       0.4773664  0.5122070   0.50000    0.515625     0.46875    0.4921875   0.5122070</code></pre>
+## rf        0.5621343  0.7770996   0.71875    0.937500     0.28125    0.6093750   0.6735251
+## glmnet    0.5667972  0.7363281   0.71875    0.812500     0.53125    0.6718750   0.6555479
+## svmRadial 0.5647005  0.7358398   0.68750    0.875000     0.31250    0.5937500   0.6351081
+## knn       0.5574651  0.6669922   0.43750    0.203125     0.90625    0.5546875   0.5542665
+## glm       0.4773664  0.5122070   0.50000    0.515625     0.46875    0.4921875   0.4943897</code></pre>
 <div class="sourceCode" id="cb246"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb246-1"><a href="#cb246-1" tabindex="-1"></a><span class="co"># Evaluate on test set</span></span>
 <span id="cb246-2"><a href="#cb246-2" tabindex="-1"></a>test_pred <span class="ot">&lt;-</span> <span class="fu">predict</span>(model_eval<span class="sc">$</span>best_model, <span class="at">newdata =</span> test_set)  <span class="co"># Consistent naming</span></span>
 <span id="cb246-3"><a href="#cb246-3" tabindex="-1"></a>conf_mat <span class="ot">&lt;-</span> <span class="fu">confusionMatrix</span>(test_pred, test_set<span class="sc">$</span>vital, <span class="at">positive =</span> <span class="fu">levels</span>(test_set<span class="sc">$</span>vital)[<span class="dv">2</span>])</span>
@@ -4206,7 +4206,7 @@ classes<br />
 <li><strong>Composite Score</strong> – mean of AUC, accuracy, and
 balanced accuracy, used for ranking</li>
 </ul>
-<p>The <strong>Random Forest (rf)</strong> model achieved the highest overall performance, with a composite score of <strong>0.777</strong> and the best <strong>test AUC (0.777)</strong>. It also delivered strong accuracy (71.9%) and excellent sensitivity (93.8%), making it especially effective at identifying “Alive” patients. However, the model’s <strong>specificity was low (28.1%)</strong>, indicating poor performance in identifying “Dead” patients — a common trade-off when class imbalance favors the majority class.</p>
+<p>The <strong>Random Forest (rf)</strong> model achieved the highest overall performance, with a composite score of <strong>0.674</strong> and the best <strong>test AUC (0.777)</strong>. It also delivered strong accuracy (71.9%) and excellent sensitivity (93.8%), making it especially effective at identifying “Alive” patients. However, the model’s <strong>specificity was low (28.1%)</strong>, indicating poor performance in identifying “Dead” patients — a common trade-off when class imbalance favors the majority class.</p>
 <p><strong>svmRadial</strong> also performed well, achieving high sensitivity (87.5%) and a strong AUC (0.736), although with slightly lower specificity. Support vector machines are well-suited to high-dimensional gene expression data, as they can handle non-linear boundaries and do not rely on assumptions of feature independence or normality.</p>
 <p><strong>glmnet</strong> showed a more balanced performance, with the highest <strong>balanced accuracy (67.2%)</strong> and improved specificity (53.1%). This suggests that penalized regression can still be effective when regularization helps mitigate overfitting, though it may not fully capture complex gene–outcome relationships.</p>
 <p>In contrast, the <strong>k-Nearest Neighbors (knn)</strong> model achieved very high specificity (90.6%) but extremely poor sensitivity (20.3%), indicating it often predicted the minority class (“Dead”). This behavior suggests knn struggled with class imbalance and high-dimensional data, where distance metrics become less informative (“curse of dimensionality”).</p>
@@ -4298,6 +4298,7 @@ Interpretation</strong></p>
 <p>The ensemble’s <strong>balanced accuracy was 64.8%</strong>, slightly higher than that of <code>rf</code> (60.9%), reflecting better equity in performance between the “Alive” and “Dead” classes. It maintained a strong <strong>sensitivity of 82.8%</strong>, successfully identifying most patients who survived, while also improving <strong>specificity to 46.9%</strong> — a notable gain over <code>rf</code>’s low specificity of 28.1%, which often misclassified “Dead” patients.</p>
 <p>Importantly, <strong>McNemar’s test</strong> yielded a <strong>p-value of 0.3447</strong> for the ensemble, indicating no statistically significant bias in misclassification direction. This contrasts with <code>rf</code>, which showed a significant asymmetry (p = 0.0005), suggesting the ensemble handles both classes more fairly and symmetrically.</p>
 <p>In summary, the weighted soft voting model provides a <strong>more balanced and robust classification strategy</strong> than individual models. By leveraging the strengths of multiple learners, it mitigates class bias and enhances clinical applicability in contexts where both false positives and false negatives matter.</p>
+<p>These results are consistent with expectations for supervised learning models applied to high-dimensional gene expression data. Vital status is a complex clinical outcome influenced by multiple biological and non-biological factors, and gene expression alone offers only a partial view. Moreover, the dataset’s modest size and class imbalance further limit achievable accuracy and specificity. In this context, achieving AUC values above 0.70 and balanced accuracy near 65% is a meaningful outcome, especially for an exploratory model. The ensemble’s improved balance and reduction of class bias suggest that combining diverse models can mitigate individual weaknesses and provide more reliable predictions—an encouraging result for future multi-modal or integrative approaches.</p>
 </div>
 </div>
 </div>
