@@ -1798,7 +1798,7 @@ This output compares the unsupervised K-means clusters (K = 4) to the known clin
 \*\*Clusters 3 and 4\* are also moderately sized and show slight enrichment for "Alive" samples.
 Although the clusters were computed without using any clinical labels, some mild separation by outcome is observed — hinting at biological relevance of the clusters.
 
-### Supervised Analysis {.tabset}
+## Supervised Analysis {.tabset}
 
 Supervised analysis is a machine learning approach where models are trained using an input dataset along with known labels (outcomes) associated with those data points.\
 During training, the model learns the relationship between the input features and their labels by iteratively adjusting its internal parameters to minimize the error between its predictions and the true labels.\
@@ -1809,7 +1809,7 @@ For example, they can predict clinical phenotypes based on gene expression profi
 
 ------------------------------------------------------------------------
 
-#### Steps for LUAD Gene Expression Data
+### Steps for LUAD Gene Expression Data
 
 **1. Data Preparation**\
 We begin by preparing the normalized gene expression data for use in machine learning models.
@@ -1902,7 +1902,7 @@ print(prop.table(table(test_set$vital)))
 
 ```
 
-#### Model Simulation
+### Model Simulation
 
 After preprocessing the gene expression data, we trained and evaluated multiple supervised machine learning models to classify patient survival status ("Alive" vs. "Dead") based on differential gene expression.
 
@@ -2118,7 +2118,7 @@ In contrast, models like `rf` and `knn` showed high sensitivity but poor specifi
 
 A closer analysis of the confusion matrix confirmed that while `svmRadial` performs well overall, its **specificity was limited (43.8%)**, with a tendency to misclassify “Dead” patients as “Alive.” This asymmetry was statistically validated by **McNemar’s test (p = 0.0056)**, indicating a significant prediction bias.
 
-#### Ensemble Strategy
+### Ensemble Strategy
 
 To address this shortcoming, we implemented a **weighted soft voting ensemble**, combining predictions from multiple models proportionally to their performance, aiming to improve overall classification balance and reduce bias.
 
