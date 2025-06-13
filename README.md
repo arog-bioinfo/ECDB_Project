@@ -25,7 +25,7 @@ ECDB\_PROJECT/
 │   │   ├── relatorio\_grupo1\_fase1.html
 │   │   └── relatorio\_grupo1\_fase2.html
 │   └── scripts\_R/                  # R scripts and Rmd
-│       ├── images/                 # Images used in R reports
+│       ├── images/                 
 │       └── relatorio\_grupo1.rmd
 │
 ├── .gitignore
