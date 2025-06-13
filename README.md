@@ -8,20 +8,35 @@ We are using the **Lung Adenocarcinoma (TCGA, GDC)** dataset, available at [cBio
 
 ## Project Structure   
 ```
-├── htmls/                         # HTML outputs
-│   └── relatorio_grupo1_fase1.html
-│   └── relatorio_grupo1_fase2.html
-│
-├── scripts_R/                    # R and Rmd scripts
-│   └── relatorio_grupo1.rmd
-│
-│
-├── data_csv/                     # CSV data files
-│
-└── README.md                     # Project documentation
 
+ECDB\_PROJECT/
+├── trabalho\_py/                    # Python Project
+│   ├── data\_csv/                   # CSV data for Python
+│   │   ├── ames\_features.csv
+│   │   ├── ames\_outputs.csv
+│   │   └── README.md
+│   └── relatorio\_grupo1.ipynb      # Jupyter Notebook
+│
+├── trabalho\_r/                     # R project
+│   ├── data\_csv/                   # CSV data for R
+│   │   ├── dge\_deseq2.csv
+│   │   └── enrichment\_analysis.csv
+│   ├── HTMLs/                      # Rendered R Markdown reports
+│   │   ├── relatorio\_grupo1\_fase1.html
+│   │   └── relatorio\_grupo1\_fase2.html
+│   └── scripts\_R/                  # R scripts and Rmd
+│       ├── images/                 # Images used in R reports
+│       └── relatorio\_grupo1.rmd
+│
+├── .gitignore
+├── EEUMLOGO.png
+├── LICENSE
+└── README.md
 
 ```
+
+
+
 
 ## Objectives
 The project is divided into two phases:
