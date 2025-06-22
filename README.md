@@ -1,12 +1,39 @@
-# ECDB_Project : Lung Adenocarcinoma Analysis (TCGA, GDC)
+# ECDB_Project
 
-## Overview
-This repository contains the practical work for the course *Extração de Conhecimento de Dados Biológicos (2024/2025)*. The project involves the analysis of gene expression data using the R programming language and Bioconductor packages. 
+This repository contains practical work for the course **Extração de Conhecimento de Dados Biológicos (2024/2025)**. It includes two distinct subprojects: one in **R** and one in **Python**, each focusing on a different biological dataset and task.
 
-## Dataset
-We are using the **Lung Adenocarcinoma (TCGA, GDC)** dataset, available at [cBioPortal](https://www.cbioportal.org/study/summary?id=luad_tcga_pan_can_atlas_2018). This dataset contains gene expression data for lung adenocarcinoma samples and associated clinical metadata.
+---
 
-## Project Structure   
+## 🔹 R Project – Lung Adenocarcinoma Analysis (TCGA, GDC)
+
+### Overview
+This project involves the analysis of gene expression data using the R programming language and Bioconductor packages.
+
+### Dataset
+We use the **Lung Adenocarcinoma (TCGA, GDC)** dataset, available at [cBioPortal](https://www.cbioportal.org/study/summary?id=luad_tcga_pan_can_atlas_2018). This dataset contains gene expression profiles and associated clinical metadata from lung adenocarcinoma samples.
+
+---
+
+## 🔸 Python Project – Ames Mutagenicity Prediction
+
+### Objective
+To build a machine learning model that predicts whether a drug is mutagenic based on its SMILES string.
+
+### Dataset Description
+The Ames test is a short-term bacterial reverse mutation assay that detects compounds capable of causing genetic mutations. It remains a widely used method for evaluating chemical mutagenicity.
+
+- **Type**: Binary classification  
+- **Input**: Drug SMILES string  
+- **Output**: Mutagenic (1) or Not Mutagenic (0)  
+- **Size**: 7,273 drugs  
+- **Source**: Aggregated from four publications
+
+### References
+[1] Xu, Congying, et al. “In silico prediction of chemical Ames mutagenicity.” *Journal of Chemical Information and Modeling*, 52.11 (2012): 2840–2847.
+
+---
+
+## Repo Structure   
 ```
 
 ECDB\_PROJECT/
@@ -34,60 +61,6 @@ ECDB\_PROJECT/
 └── README.md
 
 ```
-
-
-
-
-## Objectives
-The project is divided into two phases:
-### **Phase 1**
-- Data acquisition and preprocessing
-- Data summary (descriptive statistics and visualizations)
-- Univariate statistical analysis
-- Differential expression and enrichment analysis
-
-### **Phase 2**
-- Clustering (genes/samples), dimensionality reduction, and MDS
-- Predictive analysis (classification/regression with at least two models)
-- Gene selection and importance evaluation
-
-## Methodology
-
-The following tools and techniques were used throughout the analysis, organized by their role in the workflow:
-
-- **Data Acquisition & Processing**  
-  Packages: `TCGAbiolinks`, `SummarizedExperiment`, `Biobase`, `tidyverse`  
-  Used for downloading, filtering, and organizing genomic datasets, particularly from TCGA.
-
-- **Visualization**  
-  Packages: `ggplot2`, `ggbeeswarm`, `pheatmap`, `gplots`, `RColorBrewer`, `factoextra`  
-  Applied to generate scatter plots, beeswarm plots, heatmaps, and enhanced visual summaries of clustering and dimensionality reduction.
-
-- **Statistical Analysis**  
-  Packages: `DESeq2`, `edgeR`, `genefilter`, `AnnotationDbi`, `org.Hs.eg.db`  
-  Utilized for differential gene expression analysis, statistical filtering, and annotation mapping.
-
-- **Enrichment Analysis**  
-  Packages: `fgsea`, `org.Hs.eg.db`, `AnnotationDbi`  
-  Conducted gene set enrichment analysis and mapped gene identifiers to biological pathways and functions.
-
-- **Dimensionality Reduction**  
-  Packages: `Rtsne`, `factoextra`  
-  Used for reducing data dimensionality and visualizing sample separation.
-
-- **Clustering**  
-  Packages: `pheatmap`, `gplots`  
-  Implemented hierarchical clustering and heatmap visualizations to group similar samples or genes.
-
-- **Machine Learning & Predictive Modeling**  
-  Packages: `caret`, `rpart`, `rsample`  
-  Employed for model training, validation, and evaluation, especially in classifying sample groups or predicting outcomes.
-
-
-## Reproducibility
-- All analyses will be performed in R Markdown and exported as HTML reports.
-- R scripts (`.R` or `.Rmd`) will be provided to ensure full reproducibility.
-- The analysis workflow and key results will be documented in the final report.
 
 ## Team
 - Artur Gomes | pg55692
